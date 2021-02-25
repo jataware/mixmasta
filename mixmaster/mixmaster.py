@@ -1,6 +1,45 @@
 """Main module."""
+import logging
+from typing import List
+import pandas as pd
+import xarray as xr
+from shapely.geometry import Point
+import geopandas as gpd
+import numpy as np
+from osgeo import gdal
+from osgeo import gdalconst
 
-def raster2gpd(InRaster,feature_name,band=1,nodataval=-9999):
+logger = logging.getLogger(__name__)
+
+def netcdf2df(
+    netcdf: str
+) -> pd.DataFrame:
+    """
+    Produce a dataframe from a NetCDF4 file.
+
+    Parameters
+    ----------
+    netcdf: str
+        Path to the netcdf file
+
+    Returns
+    -------
+    DataFrame
+        The resultant dataframe
+    """
+    try:
+        ds = xr.open_dataset(netcdf)
+    except:
+        raise AssertionError(f"improperly formatted netCDF file ({netcdf})")
+
+    data = ds.to_dataframe()
+    df = data.reset_index()
+    return df
+
+
+def raster2df(
+	InRaster: str, feature_name: str='feature', band: int=1, nodataval: int=-9999
+) -> pd.DataFrame:
     '''
 	Description
     -----------
@@ -65,6 +104,7 @@ def raster2gpd(InRaster,feature_name,band=1,nodataval=-9999):
                 X += HalfX
                 Y += HalfY
 
-                points.append([Point(X, Y),X,Y,RowData[ThisCol],feature_name])
+                points.append([X,Y,RowData[ThisCol]])
 
-    return gpd.GeoDataFrame(points, columns=['geometry','longitude','latitude','feature_value','feature_name'])
+    return pd.DataFrame(points, columns=['longitude','latitude',feature_name])
+

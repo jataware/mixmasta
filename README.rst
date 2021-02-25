@@ -23,6 +23,12 @@ A library for common scientific model transforms
 * Documentation: https://mixmaster.readthedocs.io.
 
 
+Setup
+-----
+
+Ensure you have a working installation of `GDAL <https://trac.osgeo.org/gdal/wiki/FAQInstallationAndBuilding#FAQ-InstallationandBuilding>`_
+
+
 Features
 --------
 

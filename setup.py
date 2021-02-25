@@ -4,17 +4,17 @@
 
 from setuptools import setup, find_packages
 
+def read_requirements(path: str):
+    with open(path) as f:
+        return f.read().splitlines()
+
 with open('README.rst') as readme_file:
     readme = readme_file.read()
 
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['Click>=7.0', ]
-
-setup_requirements = [ ]
-
-test_requirements = [ ]
+install_requirements = read_requirements("requirements.txt")
 
 setup(
     author="Brandon Rose",
@@ -37,16 +37,14 @@ setup(
             'mixmaster=mixmaster.cli:main',
         ],
     },
-    install_requires=requirements,
+    install_requires=install_requirements,
     license="MIT license",
     long_description=readme + '\n\n' + history,
     include_package_data=True,
     keywords='mixmaster',
     name='mixmaster',
     packages=find_packages(include=['mixmaster', 'mixmaster.*']),
-    setup_requires=setup_requirements,
     test_suite='tests',
-    tests_require=test_requirements,
     url='https://github.com/brandomr/mixmaster',
     version='0.1.0',
     zip_safe=False,
