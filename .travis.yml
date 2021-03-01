@@ -25,5 +25,5 @@ deploy:
     secure: PLEASE_REPLACE_ME
   on:
     tags: true
-    repo: brandomr/mixmaster
+    repo: brandomr/mixmasta
     python: 3.8

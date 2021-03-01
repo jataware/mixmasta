@@ -1,1 +1,1 @@
-"""Unit test package for mixmaster."""
+"""Unit test package for mixmasta."""

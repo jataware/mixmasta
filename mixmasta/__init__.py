@@ -1,4 +1,4 @@
-"""Top-level package for mixmaster."""
+"""Top-level package for mixmasta."""
 
 __author__ = """Brandon Rose"""
 __email__ = 'brandon@jataware.com'

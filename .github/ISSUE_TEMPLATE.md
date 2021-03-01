@@ -1,4 +1,4 @@
-* mixmaster version:
+* mixmasta version:
 * Python version:
 * Operating System:
 

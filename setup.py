@@ -8,10 +8,10 @@ def read_requirements(path: str):
     with open(path) as f:
         return f.read().splitlines()
 
-with open('README.rst') as readme_file:
+with open('README.md') as readme_file:
     readme = readme_file.read()
 
-with open('HISTORY.rst') as history_file:
+with open('HISTORY.md') as history_file:
     history = history_file.read()
 
 install_requirements = read_requirements("requirements.txt")
@@ -34,18 +34,19 @@ setup(
     description="A library for common scientific model transforms",
     entry_points={
         'console_scripts': [
-            'mixmaster=mixmaster.cli:main',
+            'mixmasta=mixmasta.cli:main',
         ],
     },
     install_requires=install_requirements,
     license="MIT license",
     long_description=readme + '\n\n' + history,
+    long_description_content_type='text/markdown',
     include_package_data=True,
-    keywords='mixmaster',
-    name='mixmaster',
-    packages=find_packages(include=['mixmaster', 'mixmaster.*']),
+    keywords='mixmasta',
+    name='mixmasta',
+    packages=find_packages(include=['mixmasta', 'mixmasta.*']),
     test_suite='tests',
-    url='https://github.com/brandomr/mixmaster',
+    url='https://github.com/brandomr/mixmasta',
     version='0.1.0',
     zip_safe=False,
 )

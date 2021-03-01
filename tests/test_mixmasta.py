@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 
-"""Tests for `mixmaster` package."""
+"""Tests for `mixmasta` package."""
 
 
 import unittest
 from click.testing import CliRunner
 
-from mixmaster import mixmaster
-from mixmaster import cli
+from mixmasta import mixmasta
+from mixmasta import cli
 
 
 class TestMixmaster(unittest.TestCase):
-    """Tests for `mixmaster` package."""
+    """Tests for `mixmasta` package."""
 
     def setUp(self):
         """Set up test fixtures, if any."""
@@ -27,7 +27,7 @@ class TestMixmaster(unittest.TestCase):
         runner = CliRunner()
         result = runner.invoke(cli.main)
         assert result.exit_code == 0
-        assert 'mixmaster.cli.main' in result.output
+        assert 'mixmasta.cli.main' in result.output
         help_result = runner.invoke(cli.main, ['--help'])
         assert help_result.exit_code == 0
         assert '--help  Show this message and exit.' in help_result.output
