@@ -1,6 +1,7 @@
 """Main module."""
 import logging
 from typing import List
+import os
 import pandas as pd
 import xarray as xr
 from shapely.geometry import Point
@@ -8,6 +9,11 @@ import geopandas as gpd
 import numpy as np
 from osgeo import gdal
 from osgeo import gdalconst
+
+import sys
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
 
 logger = logging.getLogger(__name__)
 
@@ -38,29 +44,29 @@ def netcdf2df(
 
 
 def raster2df(
-	InRaster: str, feature_name: str='feature', band: int=1, nodataval: int=-9999
+    InRaster: str, feature_name: str='feature', band: int=1, nodataval: int=-9999
 ) -> pd.DataFrame:
     '''
-	Description
+    Description
     -----------
     Takes the path of a raster (.tiff) file and produces a Geopandas Data Frame.
     
     Parameters
     ----------
-	InRaster: str
-		the path of the input raster file
+    InRaster: str
+        the path of the input raster file
     feature_name: str
-    	the name of the feature represented by the pixel values 
+        the name of the feature represented by the pixel values 
     band: int, default 1
-    	the band to operate on
+        the band to operate on
     nodataval: int, default -9999
-    	the value for no data pixels
+        the value for no data pixels
 
-   	Examples
+    Examples
     --------
     Converting a geotiff of rainfall data into a geopandas dataframe
 
-	>>> gdf = raster2gpd('path_to_raster.geotiff', 'rainfall', band=1)
+    >>> df = raster2df('path_to_raster.geotiff', 'rainfall', band=1)
 
     '''
 
@@ -108,3 +114,44 @@ def raster2df(
 
     return pd.DataFrame(points, columns=['longitude','latitude',feature_name])
 
+
+def geocode(
+    df: pd.DataFrame, x: str='longitude', y: str='latitude'
+) -> pd.DataFrame:
+    '''
+    Description
+    -----------
+    Takes a dataframe containing coordinate data and geocodes it to GADM (https://gadm.org/)
+    
+    Parameters
+    ----------
+    df: pd.DataFrame
+        a pandas dataframe containing point data
+    x: str, default 'longitude'
+        the name of the column containing longitude information
+    y: str, default 'latitude'
+        the name of the column containing latitude data
+
+    Examples
+    --------
+    Geocoding a dataframe with columns named 'lat' and 'lon'
+
+    >>> df = geocode(df, x='lon', y='lat')
+
+    '''
+    gadm_data_dir = os.path.expanduser("~") 
+    gadm = gpd.read_file(f"{gadm_data_dir}/mixmasta_data/gadm/gadm36_2.shp")
+    gadm['country'] = gadm['NAME_0']
+    gadm['state'] = gadm['NAME_1']
+    gadm['admin1'] = gadm['NAME_1']
+    gadm['admin2'] = gadm['NAME_2']
+    gadm = gadm[['geometry','country','state','admin1','admin2']]
+
+    df['geometry'] = df.apply(lambda row: Point(row[x], row[y]), axis=1)
+    gdf = gpd.GeoDataFrame(df)
+
+    # Spatial merge on GADM to obtain admin areas
+    gdf = gpd.sjoin(gdf, gadm, how="left", op='intersects')
+    del(gdf['geometry'])
+    del(gdf['index_right'])
+    return pd.DataFrame(gdf)
