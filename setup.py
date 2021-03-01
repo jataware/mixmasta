@@ -47,6 +47,6 @@ setup(
     packages=find_packages(include=['mixmasta', 'mixmasta.*']),
     test_suite='tests',
     url='https://github.com/brandomr/mixmasta',
-    version='0.1.0',
+    version='0.2.0',
     zip_safe=False,
 )
