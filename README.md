@@ -18,6 +18,8 @@ pip install numpy==1.20.1
 pip install mixmasta
 ```
 
+> Note: if you had a prior installation of GDAL you may need to run `pip install mixmasta --no-cache-dir` in a clean environment.
+
 You must install the GADM2 data with:
 
 ```
