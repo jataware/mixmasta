@@ -1,10 +1,22 @@
 # mixmasta
 
-A library for common scientific model transforms
+A library for common scientific model transforms. This library enables fast and intuitive transforms including:
+
+* Converting a `geotiff` to a `csv`
+* Converting a `NetCDF` to a `csv`
+* Geocoding `csv` data that contains latitude and longitude
+
 
 ## Setup
 
 Ensure you have a working installation of [GDAL](https://trac.osgeo.org/gdal/wiki/FAQInstallationAndBuilding#FAQ-InstallationandBuilding)
+
+You also need to ensure that `numpy` is installed prior to `mixmasta` installation. This is an artifact of GDAL, which will build incorrectly if `numpy` is not already configured:
+
+```
+pip install numpy==1.20.1
+pip install mixmasta
+```
 
 You must install the GADM2 data with:
 
