@@ -44,7 +44,7 @@ def netcdf2df(
 
 
 def raster2df(
-    InRaster: str, feature_name: str='feature', band: int=1, nodataval: int=-9999
+    InRaster: str, feature_name: str='feature', band: int=1, nodataval: int=-9999, date: str=None
 ) -> pd.DataFrame:
     '''
     Description
@@ -61,6 +61,8 @@ def raster2df(
         the band to operate on
     nodataval: int, default -9999
         the value for no data pixels
+    date: str, default None
+        date associated with the raster (if any)
 
     Examples
     --------
@@ -112,7 +114,10 @@ def raster2df(
 
                 points.append([X,Y,RowData[ThisCol]])
 
-    return pd.DataFrame(points, columns=['longitude','latitude',feature_name])
+    df = pd.DataFrame(points, columns=['longitude','latitude',feature_name])
+    if date:
+        df['date'] = date
+    return df
 
 
 def geocode(

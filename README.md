@@ -38,7 +38,7 @@ from mixmasta import mixmasta as mix
 df = mix.raster2df('chirps-v2.0.2021.01.3.tif', feature_name='rainfall', band=1)
 ```
 
-Note that you should specify the data band of the geotiff to process if it is multi-band. You may also specify the name of the feature column to produce.
+Note that you should specify the data band of the geotiff to process if it is multi-band. You may also specify the name of the feature column to produce. You may optionally specify a `date` if the geotiff has an associated date. For example:
 
 Convert a NetCDF to a dataframe with:
 
