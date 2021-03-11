@@ -13,7 +13,7 @@
 
 To transform your file and access the resulting csv file:
 
-  1. mount the file-to-transform to the Docker container
+  1. mount your folder with your file-to-transform to the Docker container
   2. mount your output folder to the Docker container
  
 To run the examples below:
