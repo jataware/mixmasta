@@ -107,7 +107,7 @@ docker run -v $PWD/in:/inputs \
            -y lat 
 ```
 
-#### Available CLI Parameters
+### Available CLI Parameters
 
 `-xform`: type of transform desired
   
