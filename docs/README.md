@@ -40,7 +40,7 @@ docker run -v $PWD/in:/inputs \
 
 ### Convert netcdf to *Geocoded* csv
 
-Note: Geocoding takes some time...
+Note: Geocoding takes some time...in this case we geocode down to admin2; you can also geocode to the admin3 level with `-geo admin3`
 
 ```
 docker run -v $PWD/in:/inputs \
@@ -49,7 +49,7 @@ docker run -v $PWD/in:/inputs \
            -xform netcdf \
            -input_file tos_O1_2001-2002.nc \
            -output_file netcdf_geo.csv \
-           -geo True \
+           -geo admin2 \
            -x lon \
            -y lat
 ```
@@ -86,7 +86,7 @@ docker run -v $PWD/in:/inputs \
            -output_file geotiff_geo.csv \
            -feature_name rainfall \
            -band 1 \
-           -geo True \
+           -geo admin2 \
            -x longitude \
            -y latitude \
            -date '5/4/2010' 
@@ -94,13 +94,14 @@ docker run -v $PWD/in:/inputs \
 
 ### Convert a csv file to *Geocoded* csv
 
-Note: Geocoding takes some time...
+Note: Geocoding takes some time...in this case we geocode down to admin2; you can also geocode to the admin3 level with `-geo admin3`
 
 ```
 docker run -v $PWD/in:/inputs \
            -v $PWD/out:/outputs \
            jataware/mixmasta:0.1 \
            -xform geocode \
+           -geo admin2 \
            -input_file test_geocode.csv \
            -output_file geocodeONLY.csv \
            -x lon \
@@ -115,11 +116,11 @@ docker run -v $PWD/in:/inputs \
   - type=str
   - default=None
 
-`-geo`: Boolean flag. If `-geo True` return a transformed and geocoded csv file. If `-geo False` return a transformed csv file. 
+`-geo`: If you wish to geocode, choose the lowest admin level: `admin2` or `admin3`. Defualt is `None` so your file will only be be geocoded, to the admin-level you select, if you include the `-geo` tag.
 
-  - options: `True` or `False`
-  - type=bool
-  - default=False
+  - options: `admin2` or `admin3`
+  - type=str
+  - default=None
  
 `-input_file`: Filename of the file to transform. 
 
