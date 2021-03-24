@@ -61,6 +61,46 @@ df = mix.raster2df('chirps-v2.0.2021.01.3.tif', feature_name='rainfall', band=1)
 df_g = mix.geocode("admin2", df, x='longitude', y='latitude')
 ```
 
+## Running with CLI
+
+After cloning the repository and changing to the `mixmasta` directory, you can run mixmasta via the command line. 
+
+Set-up:
+
+While you can point `mixmasta` to any file you would like to transform, the examples below assume your file is in the `inputs` folder; the transformed `.csv` file will be written to the `outputs` folder.
+
+- Transform geotiff to geocoded csv:
+```
+python3 mixmasta/cli.py -xform geotiff -input_file chirps-v2.0.2021.01.3.tif -output_file geotiffTEST.csv \
+                        -geo admin2 -feature_name rainfall -band=1 -date='5/4/2010' -x longitude -y latitude
+```
+
+- Transform geotiff to csv:
+```
+python3 mixmasta/cli.py -xform geotiff -input_file maxhop1.tif -output_file maxhopOUT.csv \
+                        -geo admin2 -feature_name probabilty -band=1 -x longitude -y latitude
+```
+
+- Transform netcdf to geocoded csv:
+
+```
+python3 mixmasta/cli.py -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf.csv \
+                        -geo admin2 -x lon -y lat
+```
+
+- Transform netcdf to csv:
+```
+python3 mixmasta/cli.py -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf.csv
+```
+
+-geocode an existing csv file:
+
+```
+python3 mixmasta/cli.py -xform geocode -input_file no_geo.csv -geo admin3 -output_file geoed_no_geo.csv \
+                        -x longitude -y latitude
+```
+
+
 ## Credits
 
 This package was created with [Cookiecutter](https://github.com/audreyr/cookiecutter) and the [audreyr/cookiecutter-pypackage](https://github.com/audreyr/cookiecutter-pypackage) project template.
