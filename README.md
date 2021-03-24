@@ -55,9 +55,10 @@ from mixmasta import mixmasta as mix
 # First, load in the geotiff as a dataframe
 df = mix.raster2df('chirps-v2.0.2021.01.3.tif', feature_name='rainfall', band=1)
 
-# next, we can geocode the dataframe by specifying the names of the x and y columns
-# in this case, they are 'longitude' and 'latitude'
-df_g = mix.geocode(df, x='longitude', y='latitude')
+# next, we can geocode the dataframe to the admin-level desired (`admin2` or `admin3`)
+# by specifying the names of the x and y columns 
+# in this case, we will geocode to admin2 where x,y are are 'longitude' and 'latitude', respectively.
+df_g = mix.geocode("admin2", df, x='longitude', y='latitude')
 ```
 
 ## Credits
