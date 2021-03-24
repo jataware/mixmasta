@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 
-
 import click
 import sys
 import pandas as pd
@@ -9,7 +8,6 @@ from download import download_and_clean
 import os
 
 from datetime import datetime
-
 
 '''
 EXAMPLE PYTHON TEST RUNS:
