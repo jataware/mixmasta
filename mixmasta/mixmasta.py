@@ -4,7 +4,10 @@ from typing import List
 import os
 import pandas as pd
 import xarray as xr
+
+import geofeather as gf
 from shapely.geometry import Point
+from shapely import speedups
 import geopandas as gpd
 import numpy as np
 from osgeo import gdal
@@ -40,8 +43,8 @@ def netcdf2df(
 
     data = ds.to_dataframe()
     df = data.reset_index()
-    return df
 
+    return df
 
 def raster2df(
     InRaster: str, feature_name: str='feature', band: int=1, nodataval: int=-9999, date: str=None
@@ -119,15 +122,15 @@ def raster2df(
         df['date'] = date
     return df
 
-
-def geocode(
-    df: pd.DataFrame, x: str='longitude', y: str='latitude'
-) -> pd.DataFrame:
+def geocode2(
+    df: pd.DataFrame, x: str='longitude', y: str='latitude') -> pd.DataFrame:
     '''
     Description
     -----------
     Takes a dataframe containing coordinate data and geocodes it to GADM (https://gadm.org/)
     
+    GEOCODES to ADMIN 2 LEVEL
+
     Parameters
     ----------
     df: pd.DataFrame
@@ -144,19 +147,70 @@ def geocode(
     >>> df = geocode(df, x='lon', y='lat')
 
     '''
-    gadm_data_dir = os.path.expanduser("~") 
-    gadm = gpd.read_file(f"{gadm_data_dir}/mixmasta_data/gadm/gadm36_2.shp")
-    gadm['country'] = gadm['NAME_0']
-    gadm['state'] = gadm['NAME_1']
-    gadm['admin1'] = gadm['NAME_1']
-    gadm['admin2'] = gadm['NAME_2']
-    gadm = gadm[['geometry','country','state','admin1','admin2']]
+    flag = speedups.available
+    if flag == True:
+        speedups.enable()
+
+    gadm2 = gf.from_geofeather("mixmasta_data/gadm36_2.feather")
+    gadm2['country'] = gadm2['NAME_0']
+    gadm2['state'] = gadm2['NAME_1']
+    gadm2['admin1'] = gadm2['NAME_1']
+    gadm2['admin2'] = gadm2['NAME_2']
+    gadm2 = gadm2[['geometry','country','state','admin1','admin2']]
 
     df['geometry'] = df.apply(lambda row: Point(row[x], row[y]), axis=1)
     gdf = gpd.GeoDataFrame(df)
 
     # Spatial merge on GADM to obtain admin areas
-    gdf = gpd.sjoin(gdf, gadm, how="left", op='intersects')
+    gdf = gpd.sjoin(gdf, gadm2, how="left", op='within')
+    del(gdf['geometry'])
+    del(gdf['index_right'])
+    return pd.DataFrame(gdf)
+
+
+def geocode3(
+    df: pd.DataFrame, x: str='longitude', y: str='latitude') -> pd.DataFrame:
+    '''
+    Description
+    -----------
+    Takes a dataframe containing coordinate data and geocodes it to GADM (https://gadm.org/)
+    
+    GEOCODES to ADMIN 3 LEVEL
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        a pandas dataframe containing point data
+    x: str, default 'longitude'
+        the name of the column containing longitude information
+    y: str, default 'latitude'
+        the name of the column containing latitude data
+
+    Examples
+    --------
+    Geocoding a dataframe with columns named 'lat' and 'lon'
+
+    >>> df = geocode(df, x='lon', y='lat')
+
+    '''
+
+    flag = speedups.available
+    if flag == True:
+        speedups.enable()
+
+    gadm3 = gf.from_geofeather("mixmasta_data/gadm36_3.feather")
+    gadm3['country'] = gadm3['NAME_0']
+    gadm3['state']   = gadm3['NAME_1']
+    gadm3['admin1']  = gadm3['NAME_1']
+    gadm3['admin2']  = gadm3['NAME_2']
+    gadm3['admin3']  = gadm3['NAME_3']
+    gadm3 = gadm3[['geometry','country','state','admin1','admin2','admin3']]
+
+    df['geometry'] = df.apply(lambda row: Point(row[x], row[y]), axis=1)
+    gdf = gpd.GeoDataFrame(df)
+
+    # Spatial merge on GADM to obtain admin areas
+    gdf = gpd.sjoin(gdf, gadm3, how="left", op='within')
     del(gdf['geometry'])
     del(gdf['index_right'])
     return pd.DataFrame(gdf)
