@@ -65,8 +65,6 @@ def download_and_clean(admin="admin2", version=1,
     download_data_folder = f"{cdir}/{dirname}"
     
     test_if_exist = f'{download_data_folder}/{gadm_fn}'
-
-    #print(f'test_if_exist:{test_if_exist}')
     if os.path.exists(test_if_exist):
         print(f"{test_if_exist} already downloaded")
 
@@ -77,7 +75,6 @@ def download_and_clean(admin="admin2", version=1,
         
         with zipfile.ZipFile(fname, 'r') as zf:
             zf.extractall(outdir)
-        #os.rename(f"{outdir}", f"{outdir}/gadm")
         os.remove(fname)
 
         # save a version file so we can tell what it is
