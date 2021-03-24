@@ -108,8 +108,7 @@ def main(xform, geo, input_file, output_file, feature_name, band, nodataval, dat
         filePath = f'inputs/{input_file}'
         df = pd.read_csv(filePath)
 
-        if geo != None:       
-            download_and_clean(geo)
+        if geo != None:
             print(f"Geocoding {input_file} to {geo}")
             df_geo = geocode(geo, df, x, y)
             df_geo.to_csv(f"{wrkDir}/outputs/{output_file}", index=False)
