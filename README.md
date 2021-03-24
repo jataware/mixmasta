@@ -29,7 +29,7 @@ mixmasta download
 ## Usage
 
 
-Examples can be found in the `examples` directory.
+Examples can be found in the `input` directory.
 
 Convert a geotiff to a dataframe with:
 
