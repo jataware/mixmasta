@@ -84,6 +84,7 @@ def download_and_clean(admin="admin2", version=1,
 
         print("Downloaded mixmasta v{} to {}".format(version, outdir), file=sys.stderr)
 
-if __name__ == "__main__":
-    download_and_clean("admin2")
-    download_and_clean("admin3")
+# Test Download
+#if __name__ == "__main__":
+#    download_and_clean("admin2")
+#    download_and_clean("admin3")
