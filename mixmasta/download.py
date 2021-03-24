@@ -38,8 +38,8 @@ def download_progress(url, fname):
         t.total = t.n
     return fname
 
-def download_and_clean(admin="admin2", version=1, 
-                       url="https://jataware-world-modelers.s3.amazonaws.com/", 
+def download_and_clean(admin, version=1, 
+                       url="https://jataware-world-modelers.s3.amazonaws.com", 
                        dirname='mixmasta_data'):
     """Download mixmasta and prep the GADM directory.
     This downloads the zip file from the source, extracts it, renames the
@@ -49,19 +49,17 @@ def download_and_clean(admin="admin2", version=1,
     # set url for admin2 or admin3 gadm feather download:
     if admin == "admin2":
         gadm_zip_fn = "gadm36_2.feather.zip"
-        gadm_fn = "gadm36_2.feather"
-        url = url + "gadm/" + gadm_zip_fn
+        gadm_fn =  (".").join(gadm_zip_fn.split(".")[:-1])
+        url = f'{url}/gadm/{gadm_zip_fn}'
 
     else:    
         gadm_zip_fn = "gadm36_3.feather.zip"
-        gadm_fn = "gadm36_3.feather"
-        url = url + "gadm/" + gadm_zip_fn
+        gadm_fn =  (".").join(gadm_zip_fn.split(".")[:-1])
+        url = f'{url}/gadm/{gadm_zip_fn}'
 
     cdir = os.path.expanduser("~")
     fname = os.path.join(cdir, gadm_fn)
     outdir = os.path.join(cdir, dirname)
-
-    wrkDir = os.getcwd()
     download_data_folder = f"{cdir}/{dirname}"
     
     test_if_exist = f'{download_data_folder}/{gadm_fn}'
@@ -87,4 +85,3 @@ def download_and_clean(admin="admin2", version=1,
 # Test Download
 #if __name__ == "__main__":
 #    download_and_clean("admin2")
-#    download_and_clean("admin3")

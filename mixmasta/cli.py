@@ -4,7 +4,7 @@
 import click
 import sys
 import pandas as pd
-from mixmasta import netcdf2df, raster2df, geocode2, geocode3
+from mixmasta import netcdf2df, raster2df, geocode
 from download import download_and_clean
 import os
 
@@ -61,38 +61,27 @@ docker run -v $PWD/in:/inputs -v $PWD/out:/outputs mixmasta -xform geocode -inpu
 
 def main(xform, geo, input_file, output_file, feature_name, band, nodataval, date, x, y):
     """Console script for mixmasta."""
+    
     wrkDir = os.getcwd()
     
+    # If geocoding: check if gadm feather file exists; if not, download it
+    if geo != None:
+        download_and_clean(geo)
+
     if xform == "netcdf":
         
         print(f"Transforming {input_file} netcdf to csv")
         filePath = f'inputs/{input_file}'
         df = netcdf2df(filePath)
-
-        if geo == "admin2":
-            download_and_clean("admin2")
-
+        
+        if geo != None:
             print(f"Geocoding {input_file} to {geo}")
-            print(f"Start Time: {datetime.now()}")
-            df_geo = geocode2(df, x, y)
+            df_geo = geocode(geo, df, x, y)
             df_geo.to_csv(f"{wrkDir}/outputs/{output_file}", index=False)
-            print(f"End Time: {datetime.now()}")
-
-            print(df_geo.head())   
-
-        elif geo == "admin3":
-            download_and_clean("admin3")
-
-            print(f"Geocoding {input_file} to {geo}")
-            print(f"Start Time: {datetime.now()}")
-            df_geo = geocode3(df, x, y)
-            df_geo.to_csv(f"{wrkDir}/outputs/{output_file}", index=False)
-            print(f"End Time: {datetime.now()}")
-
             print(df_geo.head()) 
 
         else:
-            print("Writing netcdf csv")
+            print("Writing netcdf to csv")
             df.to_csv(f"{wrkDir}/outputs/{output_file}", index=False)
             print(df.head())
 
@@ -102,30 +91,15 @@ def main(xform, geo, input_file, output_file, feature_name, band, nodataval, dat
         print(f"Transforming {input_file} geotiff to csv")
         df = raster2df(filePath, feature_name, band, nodataval, date)
         
-        if geo == "admin2":
-            download_and_clean("admin2")
+        if geo != None:
 
             print(f"Geocoding {input_file} to {geo}")
-            print(f"Start Time: {datetime.now()}")
-            df_geo = geocode2(df, x, y)
+            df_geo = geocode(geo, df, x, y)
             df_geo.to_csv(f"{wrkDir}/outputs/{output_file}", index=False)
-            print(f"End Time: {datetime.now()}")
-            
-            print(df_geo.head()) 
-
-        elif geo == "admin3":
-            download_and_clean("admin3")
-
-            print(f"Geocoding {input_file} to {geo}")
-            print(f"Start Time: {datetime.now()}")
-            df_geo = geocode3(df, x, y)
-            df_geo.to_csv(f"{wrkDir}/outputs/{output_file}", index=False)
-            print(f"End Time: {datetime.now()}")
-            
             print(df_geo.head()) 
             
         else:
-            print("Writing geotiff csv")
+            print("Writing geotiff to csv")
             df.to_csv(f"{wrkDir}/outputs/{output_file}", index=False)
             print(df.head())
     
@@ -134,23 +108,10 @@ def main(xform, geo, input_file, output_file, feature_name, band, nodataval, dat
         filePath = f'inputs/{input_file}'
         df = pd.read_csv(filePath)
 
-        if geo == "admin2":       
-            download_and_clean("admin2")
+        if geo != None:       
+            download_and_clean(geo)
             print(f"Geocoding {input_file} to {geo}")
-            print(f"Start Time: {datetime.now()}")
-            df_geo = geocode2(df, x, y)
-            print(f"End Time: {datetime.now()}")
-
-            df_geo.to_csv(f"{wrkDir}/outputs/{output_file}", index=False)
-            print(df_geo.head())
-
-        if geo == "admin3":
-            download_and_clean("admin3") 
-            print(f"Geocoding {input_file} to {geo}")
-            print(f"Start Time: {datetime.now()}")
-            df_geo = geocode3(df, x, y)
-            print(f"End Time: {datetime.now()}")
-
+            df_geo = geocode(geo, df, x, y)
             df_geo.to_csv(f"{wrkDir}/outputs/{output_file}", index=False)
             print(df_geo.head())
 
