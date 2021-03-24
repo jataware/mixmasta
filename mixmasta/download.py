@@ -31,35 +31,57 @@ def download_file(url, fname):
 
 def download_progress(url, fname):
     """Download a file and show a progress bar."""
+
     with TqdmUpTo(unit='B', unit_scale=True, miniters=1,
               desc=url.split('/')[-1]) as t:  # all optional kwargs
         urlretrieve(url, filename=fname, reporthook=t.update_to, data=None)
         t.total = t.n
     return fname
 
-def download_and_clean(version=1, 
-                       url="https://jataware-world-modelers.s3.amazonaws.com/mixmasta.zip", 
+def download_and_clean(admin, version=1, 
+                       url="https://jataware-world-modelers.s3.amazonaws.com", 
                        dirname='mixmasta_data'):
     """Download mixmasta and prep the GADM directory.
     This downloads the zip file from the source, extracts it, renames the
     resulting directory, and removes large files not used at runtime.  
     """
+
+    # set url for admin2 or admin3 gadm feather download:
+    if admin == "admin2":
+        gadm_zip_fn = "gadm36_2.feather.zip"
+        gadm_fn =  (".").join(gadm_zip_fn.split(".")[:-1])
+        url = f'{url}/gadm/{gadm_zip_fn}'
+
+    else:    
+        gadm_zip_fn = "gadm36_3.feather.zip"
+        gadm_fn =  (".").join(gadm_zip_fn.split(".")[:-1])
+        url = f'{url}/gadm/{gadm_zip_fn}'
+
     cdir = os.path.expanduser("~")
-    print(cdir)
-    fname = os.path.join(cdir, 'mixmasta.zip')
-    print("Downloading mixmasta v{}...".format(version), file=sys.stderr)
-    download_progress(url, fname)
-    print("Finished download.")
-
+    fname = os.path.join(cdir, gadm_fn)
     outdir = os.path.join(cdir, dirname)
-    with zipfile.ZipFile(fname, 'r') as zf:
-        zf.extractall(outdir)
-    os.rename(f"{outdir}/data", f"{outdir}/gadm")
-    os.remove(fname)
+    download_data_folder = f"{cdir}/{dirname}"
+    
+    test_if_exist = f'{download_data_folder}/{gadm_fn}'
+    if os.path.exists(test_if_exist):
+        print(f"{test_if_exist} already downloaded")
 
-    # save a version file so we can tell what it is
-    vpath = os.path.join(outdir, 'version')
-    with open(vpath, 'w') as vfile:
-        vfile.write('mixmasta-{}'.format(version))
+    else:
+        print("Downloading mixmasta v{}...".format(version), file=sys.stderr)
+        download_progress(url, fname)
+        print("Finished download.")
+        
+        with zipfile.ZipFile(fname, 'r') as zf:
+            zf.extractall(outdir)
+        os.remove(fname)
 
-    print("Downloaded mixmasta v{} to {}".format(version, outdir), file=sys.stderr)
+        # save a version file so we can tell what it is
+        vpath = os.path.join(outdir, 'version')
+        with open(vpath, 'w') as vfile:
+            vfile.write('mixmasta-{}'.format(version))
+
+        print("Downloaded mixmasta v{} to {}".format(version, outdir), file=sys.stderr)
+
+# Test Download
+#if __name__ == "__main__":
+#    download_and_clean("admin2")
