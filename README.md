@@ -20,7 +20,7 @@ pip install mixmasta
 
 > Note: if you had a prior installation of GDAL you may need to run `pip install mixmasta --no-cache-dir` in a clean environment.
 
-You must install the GADM2 data with:
+You must install the GADM2 and GADM3 data with:
 
 ```
 mixmasta download
@@ -71,32 +71,32 @@ While you can point `mixmasta` to any file you would like to transform, the exam
 
 - Transform geotiff to geocoded csv:
 ```
-python3 mixmasta/cli.py -xform geotiff -input_file chirps-v2.0.2021.01.3.tif -output_file geotiffTEST.csv \
+mixmasta mix -xform geotiff -input_file chirps-v2.0.2021.01.3.tif -output_file geotiffTEST.csv \
                         -geo admin2 -feature_name rainfall -band=1 -date='5/4/2010' -x longitude -y latitude
 ```
 
 - Transform geotiff to csv:
 ```
-python3 mixmasta/cli.py -xform geotiff -input_file maxhop1.tif -output_file maxhopOUT.csv \
+mixmasta mix -xform geotiff -input_file maxhop1.tif -output_file maxhopOUT.csv \
                         -geo admin2 -feature_name probabilty -band=1 -x longitude -y latitude
 ```
 
 - Transform netcdf to geocoded csv:
 
 ```
-python3 mixmasta/cli.py -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf.csv \
+mixmasta mix -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf.csv \
                         -geo admin2 -x lon -y lat
 ```
 
 - Transform netcdf to csv:
 ```
-python3 mixmasta/cli.py -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf.csv
+mixmasta mix -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf.csv
 ```
 
 -geocode an existing csv file:
 
 ```
-python3 mixmasta/cli.py -xform geocode -input_file no_geo.csv -geo admin3 -output_file geoed_no_geo.csv \
+mixmasta mix -xform geocode -input_file no_geo.csv -geo admin3 -output_file geoed_no_geo.csv \
                         -x longitude -y latitude
 ```
 
