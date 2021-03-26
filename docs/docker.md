@@ -11,31 +11,16 @@
 
 ### Set-Up
 
-To transform your file and access the resulting csv file:
-
-  1. mount your folder with your file-to-transform to the Docker container
-  2. mount your output folder to the Docker container
- 
-To run the examples below:
-
-  1. From a CLI in your top-level directory `mkdir in && mkdir out`
-  2. Copy your file-to-transform into the `in` folder
-  3. From top-level directory run any of the docker examples below.
-  4. Your-transformed-file is written to your `out` folder.
- 
-From the examples you mount your `in` and `out`  folders to the container's `input` and `output` folders. Your folder names can be of your choosing; the Docker container folders cannot. **You must use `input` and `output` for the container folders.** 
-
-For the CLI Parameters, you only need to include the parameters related to your mixmasta job; defining unused parameters is not required.
+You will mount your current directory (`$PWD`) to `/tmp` in the container. This is somewhat arbitrary; you can mount `$PWD` more or less anywhere in the container that is not reserved. We assume that the file you want to `mix` is in your current directory; if not, you need to mount that directory or move the file to your current directory. Output will be written to `$PWD` or whichever directory you mount. In other words, `/tmp` exists as the mount on the container, not on your localhost.
 
 ### Convert netcdf to csv
 
 ```
-docker run -v $PWD/in:/inputs \
-           -v $PWD/out:/outputs \
-           jataware/mixmasta:0.1 \
+docker run -v $PWD:/tmp \
+           jataware/mixmasta:latest \
            -xform netcdf \
-           -input_file tos_O1_2001-2002.nc \
-           -output_file netcdf.csv
+           -input_file /tmp/tos_O1_2001-2002.nc \
+           -output_file /tmp/netcdf.csv
 ```
 
 ### Convert netcdf to *Geocoded* csv
@@ -43,12 +28,11 @@ docker run -v $PWD/in:/inputs \
 Note: Geocoding takes some time...in this case we geocode down to admin2; you can also geocode to the admin3 level with `-geo admin3`
 
 ```
-docker run -v $PWD/in:/inputs \
-           -v $PWD/out:/outputs \
-            jataware/mixmasta:0.1 \
+docker run -v $PWD:/tmp \
+           jataware/mixmasta:latest \
            -xform netcdf \
-           -input_file tos_O1_2001-2002.nc \
-           -output_file netcdf_geo.csv \
+           -input_file /tmp/tos_O1_2001-2002.nc \
+           -output_file /tmp/netcdf_geo.csv \
            -geo admin2 \
            -x lon \
            -y lat
@@ -60,12 +44,11 @@ docker run -v $PWD/in:/inputs \
 NOTE: `-date` is the last argument to avoid issues with the single quote
 
 ```
-docker run -v $PWD/in:/inputs \
-           -v $PWD/out:/outputs \
-           jataware/mixmasta:0.1 \
+docker run -v $PWD:/tmp \
+           jataware/mixmasta:latest \
            -xform geotiff \
-           -input_file chirps-v2.0.2021.01.3.tif \
-           -output_file geotiff.csv \
+           -input_file /tmp/chirps-v2.0.2021.01.3.tif \
+           -output_file /tmp/geotiff.csv \
            -feature_name rainfall \
            -band 1 \
            -date '5/4/2010'
@@ -78,12 +61,11 @@ NOTE: `-date` is the last argument to avoid issues with the single quote
 Note: Geocoding takes some time...
 
 ```
-docker run -v $PWD/in:/inputs \
-           -v $PWD/out:/outputs \
-           jataware/mixmasta:0.1 \
+docker run -v $PWD:/tmp \
+           jataware/mixmasta:latest \
            -xform geotiff \
-           -input_file chirps-v2.0.2021.01.3.tif \
-           -output_file geotiff_geo.csv \
+           -input_file /tmp/chirps-v2.0.2021.01.3.tif \
+           -output_file /tmp/geotiff_geo.csv \
            -feature_name rainfall \
            -band 1 \
            -geo admin2 \
@@ -97,13 +79,12 @@ docker run -v $PWD/in:/inputs \
 Note: Geocoding takes some time...in this case we geocode down to admin2; you can also geocode to the admin3 level with `-geo admin3`
 
 ```
-docker run -v $PWD/in:/inputs \
-           -v $PWD/out:/outputs \
-           jataware/mixmasta:0.1 \
+docker run -v $PWD:/tmp \
+           jataware/mixmasta:latest \
            -xform geocode \
            -geo admin2 \
-           -input_file test_geocode.csv \
-           -output_file geocodeONLY.csv \
+           -input_file /tmp/test_geocode.csv \
+           -output_file /tmp/geocodeONLY.csv \
            -x lon \
            -y lat 
 ```
