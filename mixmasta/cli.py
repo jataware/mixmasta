@@ -9,42 +9,6 @@ import os
 
 from datetime import datetime
 
-'''
-EXAMPLE PYTHON TEST RUNS:
-
--geotiff
-python3 mixmasta/cli.py -xform geotiff -input_file chirps-v2.0.2021.01.3.tif -output_file geotiffTEST.csv -geo admin2 -feature_name rainfall -band=1 -date='5/4/2010' -x longitude -y latitude
-python3 mixmasta/cli.py -xform geotiff -input_file maxhop1.tif -output_file maxhopOUT.csv -geo admin2 -feature_name probabilty -band=1 -x longitude -y latitude
-
--netcfd
-python3 mixmasta/cli.py -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf.csv
-python3 mixmasta/cli.py -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf.csv -geo admin2 -x lon -y lat
-
--geocode
-python3 mixmasta/cli.py -xform geocode -input_file no_geo.csv -geo admin2 -output_file no_geo_geo.csv -x longitude -y latitude
-'''
-
-'''
-EXAMPLE DOCKER TEST RUNS:
-Where:
- <in>  = local folder with file to transform
- <out> = local folder to write outouts to
-
- outputs/inputs folders are built into the Docker image
-
-# netcdf
-docker run -v $PWD/in:/inputs -v $PWD/out:/outputs mixmasta:0.2 -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf.csv
-docker run -v $PWD/in:/inputs -v $PWD/out:/outputs mixmasta -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf_geo.csv -geo admin2 -x lon -y lat
-
-# geotiff
-docker run -v $PWD/inputs:/inputs -v $PWD/outputs:/outputs mixmasta:0.2 -xform geotiff -input_file chirps-v2.0.2021.01.3.tif -output_file geotiff.csv -feature_name rainfall -band 1 -date '5/4/2010'
-docker run -v $PWD/inputs:/inputs -v $PWD/outputs:/outputs mixmasta:0.2 -xform geotiff -input_file chirps-v2.0.2021.01.3.tif -output_file geotiff_geo.csv -feature_name rainfall -band 1 -date '5/4/2010' -geo admin2 -x longitude -y latitude
-
-#geocode ONLY
-docker run -v $PWD/in:/inputs -v $PWD/out:/outputs mixmasta -xform geocode -input_file test_geocode.csv -output_file geocodeONLY.csv -x lon -y lat 
-
-'''
-
 @click.command()
 @click.argument('command')
 @click.option('-xform', type=str, default=None)
