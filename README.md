@@ -77,15 +77,13 @@ mixmasta mix -xform geotiff -input_file chirps-v2.0.2021.01.3.tif -output_file g
 
 - Transform geotiff to csv:
 ```
-mixmasta mix -xform geotiff -input_file maxhop1.tif -output_file maxhopOUT.csv \
-                        -geo admin2 -feature_name probabilty -band=1 -x longitude -y latitude
+mixmasta mix -xform geotiff -input_file maxhop1.tif -output_file maxhopOUT.csv -geo admin2 -feature_name probabilty -band=1 -x longitude -y latitude
 ```
 
 - Transform netcdf to geocoded csv:
 
 ```
-mixmasta mix -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf.csv \
-                        -geo admin2 -x lon -y lat
+mixmasta mix -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf.csv -geo admin2 -x lon -y lat
 ```
 
 - Transform netcdf to csv:
@@ -96,8 +94,7 @@ mixmasta mix -xform netcdf -input_file tos_O1_2001-2002.nc -output_file netcdf.c
 -geocode an existing csv file:
 
 ```
-mixmasta mix -xform geocode -input_file no_geo.csv -geo admin3 -output_file geoed_no_geo.csv \
-                        -x longitude -y latitude
+mixmasta mix -xform geocode -input_file no_geo.csv -geo admin3 -output_file geoed_no_geo.csv -x longitude -y latitude
 ```
 
 
