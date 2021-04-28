@@ -4,7 +4,6 @@ import logging
 import os
 import sys
 from typing import List
-
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -12,7 +11,7 @@ import xarray as xr
 from osgeo import gdal, gdalconst
 from shapely import speedups
 from shapely.geometry import Point
-
+from datetime import datetime
 import geofeather as gf
 
 if not sys.warnoptions:
@@ -21,7 +20,6 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
 logger = logging.getLogger(__name__)
-
 
 def netcdf2df(netcdf: str) -> pd.DataFrame:
     """
@@ -223,15 +221,25 @@ def format_time(t: str, time_format: str, validate: bool = True) -> int:
 
     >>> epoch = format_time('5/12/20 12:20', '%m/%d/%y %H:%M')
     """
+
     try:
         t_ = int(datetime.strptime(t, time_format).timestamp())
+        
         return t_
     except Exception as e:
+        print(e)
         if validate:
             raise Exception(e)
         else:
             return None
 
+def process_netcdf(file: str, mapper: dict, admin: str):
+    df = netcdf2df(file)
+    return normalizer(df, mapper, admin)
+
+def process_raster(transform, mapper: dict, admin: str):
+    df = raster2df(transform['InRaster'], transform['feature_name'], transform['band'], transform['nodataval'], transform['date'])
+    return normalizer(df, mapper, admin)
 
 def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     """
@@ -253,22 +261,43 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     >>> df_norm = normalizer(df, mapper, 'admin3')
     """
     # subset dataframe for only columns in mapper
+    time_cols = [kk for kk, vv in mapper.items() if vv['Primary_time'] == 'true']
+    geo_cols = [kk for kk, vv in mapper.items() if vv['Primary_geo'] == 'true']
     df = df[list(mapper.keys())]
 
     # Rename protected columns
     # and perform type conversion on the time column
     features = []
+    print('time_cols',time_cols)
     for kk, vv in mapper.items():
-        if vv["Type_Form"] == "DATE/TIME":
+        
+        if kk in time_cols:
+            print('time', kk)
             df[kk] = df[kk].apply(
-                lambda x: format_time(x, vv["Time_Format"], validate=False)
+                lambda x: format_time(x, vv["Time_format"], validate=False)
             )
-            df.rename(columns={kk: "timestamp"}, inplace=True)
-        elif vv["Type_Form"] == "GEO":
+            print(df[kk].head(5))
+            staple_col_name = "timestamp"
+            df.rename(columns={kk: staple_col_name}, inplace=True)
+        elif kk in geo_cols:
             if vv["Geo"] == "Latitude":
-                df.rename(columns={kk: "lat"}, inplace=True)
+                staple_col_name = "lat"
+                df.rename(columns={kk: staple_col_name}, inplace=True)
             elif vv["Geo"] == "Longitude":
-                df.rename(columns={kk: "lng"}, inplace=True)
+                staple_col_name = "lng"
+                df.rename(columns={kk: staple_col_name}, inplace=True)
+            elif vv["Geo"] == "Coordinates":
+                c_f = vv['Coordinate_format']
+                cords = df[kk].values
+                if c_f == 'Longitude,Latitude':
+                    lats = [x for x in cords.split(',')[1]]
+                    longs = [x for x in cords.split(',')[0]]
+                else:
+                    lats = [x for x in cords.split(',')[0]]
+                    longs = [x for x in cords.split(',')[1]]
+                df['lng'] = longs
+                df['lat'] = lats
+                del df[kk]
         else:
             features.append(kk)
 
@@ -281,11 +310,19 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     df_out = pd.DataFrame()
     for feat in features:
         df_ = df[protected_cols + [feat]].copy()
-        df_["feature"] = mapper[feat]["new_col_name"]
+        try:
+            if mapper[feat]["new_col_name"] == None:
+                df_["feature"] = feat
+            else:
+                df_["feature"] = mapper[feat]["new_col_name"]
+        except:
+            df_["feature"] = feat
         df_.rename(columns={feat: "value"}, inplace=True)
         if len(df_out) == 0:
             df_out = df_
         else:
             df_out = df_out.append(df_)
+    print('head', df_out.head())
+    print('len', len(df_out))
 
     return df_out
