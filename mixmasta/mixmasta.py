@@ -233,14 +233,6 @@ def format_time(t: str, time_format: str, validate: bool = True) -> int:
         else:
             return None
 
-def process_netcdf(file: str, mapper: dict, admin: str):
-    df = netcdf2df(file)
-    return normalizer(df, mapper, admin)
-
-def process_raster(transform, mapper: dict, admin: str):
-    df = raster2df(transform['InRaster'], transform['feature_name'], transform['band'], transform['nodataval'], transform['date'])
-    return normalizer(df, mapper, admin)
-
 def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     """
     Description
@@ -327,7 +319,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
 
     return df_out
 
-def process(mapper: dict, admin: str):
+def process(fp, mapper: dict, admin: str):
     transform = mapper['meta']
     mapper = mapper['annotations']
     
@@ -336,11 +328,11 @@ def process(mapper: dict, admin: str):
             d = None
         else:
             d = transform['Date']
-        df = raster2df('data/' + transform['fname'], transform['Feature_name'], transform['Band'], transform['Null_val'], transform['Date'], d)
+        df = raster2df(fp, transform['Feature_name'], transform['Band'], transform['Null_val'], transform['Date'], d)
 
     elif transform['ftype'] != 'csv':
-        df = netcdf2df('data/' + transform['fname'])
+        df = netcdf2df(fp)
     else:
-        df = pd.read_csv('data/' + transform['fname'])
+        df = pd.read_csv(fp)
 
     return normalizer(df, mapper, admin)
