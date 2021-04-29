@@ -326,3 +326,21 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     print('len', len(df_out))
 
     return df_out
+
+def process(mapper: dict, admin: str):
+    transform = mapper['meta']
+    mapper = mapper['annotations']
+    
+    if transform['ftype'] == 'Geotiff':
+        if transform['Date']:
+            d = None
+        else:
+            d = transform['Date']
+        df = raster2df('data/' + transform['fname'], transform['Feature_name'], transform['Band'], transform['Null_val'], transform['Date'], d)
+
+    elif transform['ftype'] != 'csv':
+        df = netcdf2df('data/' + transform['fname'])
+    else:
+        df = pd.read_csv('data/' + transform['fname'])
+
+    return normalizer(df, mapper, admin)
