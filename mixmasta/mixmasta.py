@@ -328,7 +328,7 @@ def process(fp, mapper: dict, admin: str):
             d = None
         else:
             d = transform['Date']
-        df = raster2df(fp, transform['Feature_name'], transform['Band'], transform['Null_val'], transform['Date'], d)
+        df = raster2df(fp, transform['Feature_name'], int(transform['Band']), int(transform['Null_val']), d)
 
     elif transform['ftype'] != 'csv':
         df = netcdf2df(fp)
