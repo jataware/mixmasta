@@ -324,7 +324,7 @@ def process(fp, mapper: dict, admin: str):
     mapper = mapper['annotations']
     
     if transform['ftype'] == 'Geotiff':
-        if transform['Date']:
+        if transform['Date'] == "":
             d = None
         else:
             d = transform['Date']
