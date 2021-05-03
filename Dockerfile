@@ -16,7 +16,7 @@ ENV C_INCLUDE_PATH=/usr/include/gdal
 WORKDIR /
 
 RUN pip3 install numpy==1.20.1
-RUN pip3 install mixmasta==0.3.1
+RUN pip3 install mixmasta==0.4.1
 RUN mixmasta download
 
 ENTRYPOINT ["mixmasta"]

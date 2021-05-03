@@ -18,7 +18,7 @@ def cli():
 @click.option("--input_file", type=str, default=None)
 @click.option("--mapper", type=str, default=None)
 @click.option("--geo", type=str, default=None)
-@click.option("--output_file", type=str, default="mixmasta_output.parquet.gzip")
+@click.option("--output_file", type=str, default="mixmasta_output")
 def causemosify(input_file, mapper, geo, output_file):
     """Processor for generating CauseMos compliant datasets."""
     click.echo("Causemosifying data...")

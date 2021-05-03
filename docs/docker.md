@@ -18,9 +18,10 @@ You will mount your current directory (`$PWD`) to `/tmp` in the container. This 
 ```
 docker run -v $PWD:/tmp \
            jataware/mixmasta:latest \
-           -xform netcdf \
-           -input_file /tmp/tos_O1_2001-2002.nc \
-           -output_file /tmp/netcdf.csv
+           mix \
+           --xform netcdf \
+           --input_file /tmp/tos_O1_2001-2002.nc \
+           --output_file /tmp/netcdf.csv
 ```
 
 ### Convert netcdf to *Geocoded* csv
@@ -30,28 +31,30 @@ Note: Geocoding takes some time...in this case we geocode down to admin2; you ca
 ```
 docker run -v $PWD:/tmp \
            jataware/mixmasta:latest \
-           -xform netcdf \
-           -input_file /tmp/tos_O1_2001-2002.nc \
-           -output_file /tmp/netcdf_geo.csv \
-           -geo admin2 \
-           -x lon \
-           -y lat
+           mix \
+           --xform netcdf \
+           --input_file /tmp/tos_O1_2001-2002.nc \
+           --output_file /tmp/netcdf_geo.csv \
+           --geo admin2 \
+           --x lon \
+           --y lat
 ```
 
 
 ### Convert geotiff to csv
 
-NOTE: `-date` is the last argument to avoid issues with the single quote
+NOTE: `--date` is the last argument to avoid issues with the single quote
 
 ```
 docker run -v $PWD:/tmp \
            jataware/mixmasta:latest \
-           -xform geotiff \
-           -input_file /tmp/chirps-v2.0.2021.01.3.tif \
-           -output_file /tmp/geotiff.csv \
-           -feature_name rainfall \
-           -band 1 \
-           -date '5/4/2010'
+           mix \
+           --xform geotiff \
+           --input_file /tmp/chirps-v2.0.2021.01.3.tif \
+           --output_file /tmp/geotiff.csv \
+           --feature_name rainfall \
+           --band 1 \
+           --date '5/4/2010'
 ```
 
 ### Convert geotiff to *Geocoded* csv
@@ -63,15 +66,16 @@ Note: Geocoding takes some time...
 ```
 docker run -v $PWD:/tmp \
            jataware/mixmasta:latest \
-           -xform geotiff \
-           -input_file /tmp/chirps-v2.0.2021.01.3.tif \
-           -output_file /tmp/geotiff_geo.csv \
-           -feature_name rainfall \
-           -band 1 \
-           -geo admin2 \
-           -x longitude \
-           -y latitude \
-           -date '5/4/2010' 
+           mix \
+           --xform geotiff \
+           --input_file /tmp/chirps-v2.0.2021.01.3.tif \
+           --output_file /tmp/geotiff_geo.csv \
+           --feature_name rainfall \
+           --band 1 \
+           --geo admin2 \
+           --x longitude \
+           --y latitude \
+           --date '5/4/2010' 
 ```
 
 ### Convert a csv file to *Geocoded* csv
@@ -81,64 +85,99 @@ Note: Geocoding takes some time...in this case we geocode down to admin2; you ca
 ```
 docker run -v $PWD:/tmp \
            jataware/mixmasta:latest \
-           -xform geocode \
-           -geo admin2 \
-           -input_file /tmp/test_geocode.csv \
-           -output_file /tmp/geocodeONLY.csv \
-           -x lon \
-           -y lat 
+           mix \
+           --xform geocode \
+           --geo admin2 \
+           --input_file /tmp/test_geocode.csv \
+           --output_file /tmp/geocodeONLY.csv \
+           --x lon \
+           --y lat 
 ```
 
-### Available CLI Parameters
+### Causemosify a file
 
-`-xform`: type of transform desired
+```
+docker run -v $PWD:/tmp \
+           jataware/mixmasta:latest \
+           causemosify \
+           --input_file=/tmp/chirps-v2.0.2021.01.3.tif \
+           --mapper=/tmp/mapper.json \
+           --geo=admin3 \
+           --output_file=example_output
+```
+
+### mix command
+
+This command exposes the full mixmasta API to convert and geocode data.
+
+`--xform`: type of transform desired
   
   - options: `geotiff`, `netcdf`, `geocode` 
   - type=str
   - default=None
 
-`-geo`: If you wish to geocode, choose the lowest admin level: `admin2` or `admin3`. Defualt is `None` so your file will only be be geocoded, to the admin-level you select, if you include the `-geo` tag.
+`--geo`: If you wish to geocode, choose the lowest admin level: `admin2` or `admin3`. Defualt is `None` so your file will only be be geocoded, to the admin-level you select, if you include the `-geo` tag.
 
   - options: `admin2` or `admin3`
   - type=str
   - default=None
  
-`-input_file`: Filename of the file to transform. 
+`--input_file`: Filename of the file to transform. 
 
   - type=str
   - default=None
   
-`-output_file`: Transformed file name. In the container, transformed files are written to the `outputs/` folder. 
+`--output_file`: Transformed file name. In the container, transformed files are written to the `outputs/` folder. 
 
   - type=str
   - default=None
   
-`-feature_name`: Feature name in your geotiff file
+`--feature_name`: Feature name in your geotiff file
 
   - type=str
   - default=None
  
-`-band`: geotiff band desired
+`--band`: geotiff band desired
 
   - type=int
   - default=None
   
-`-nodataval`: No data value
+`--nodataval`: No data value
 
   - type=int
   - default=-9999
   
-`-date`: You may optionally specify a date if the geotiff has an associated date; the date must be in single quotes: `-date '5/4/2010'`
+`--date`: You may optionally specify a date if the geotiff has an associated date; the date must be in single quotes: `-date '5/4/2010'`
 
   - type=str
   - default=None
   
-`-x`: The naming convention of your file to indicate: Longitude
+`--x`: The naming convention of your file to indicate: Longitude
 
   - type=str
   - default=None
   
-`-y`: The naming convention of your file to indicate: Latitude
+`--y`: The naming convention of your file to indicate: Latitude
 
   - type=str
   - default=None
+
+### causemosify command
+
+This command takes in a data file and a mapper file and converts it into a CauseMos compliant format.
+
+`--input_file`: Filename of the file to transform. 
+
+  - type=str
+  - default=None
+
+`--geo`: If you wish to geocode, choose the lowest admin level: `admin2` or `admin3`. Defualt is `None` so your file will only be be geocoded, to the admin-level you select, if you include the `-geo` tag.
+
+  - options: `admin2` or `admin3`
+  - type=str
+  - default=None 
+  
+`--output_file`: Transformed file name. In the container, transformed files are written to the `outputs/` folder. 
+
+  - type=str
+  - default=`mixmasta_output` (which writes a file to `mixmasta_output.parquet.gzip`)
