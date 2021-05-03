@@ -4,10 +4,10 @@
 
 
 import unittest
+
 from click.testing import CliRunner
 
-from mixmasta import mixmasta
-from mixmasta import cli
+from mixmasta import cli, mixmasta
 
 
 class TestMixmaster(unittest.TestCase):
@@ -27,7 +27,7 @@ class TestMixmaster(unittest.TestCase):
         runner = CliRunner()
         result = runner.invoke(cli.main)
         assert result.exit_code == 0
-        assert 'mixmasta.cli.main' in result.output
-        help_result = runner.invoke(cli.main, ['--help'])
+        assert "mixmasta.cli.main" in result.output
+        help_result = runner.invoke(cli.main, ["--help"])
         assert help_result.exit_code == 0
-        assert '--help  Show this message and exit.' in help_result.output
+        assert "--help  Show this message and exit." in help_result.output
