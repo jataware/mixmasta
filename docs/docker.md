@@ -103,7 +103,7 @@ docker run -v $PWD:/tmp \
            --input_file=/tmp/chirps-v2.0.2021.01.3.tif \
            --mapper=/tmp/mapper.json \
            --geo=admin3 \
-           --output_file=example_output
+           --output_file=/tmp/example_output
 ```
 
 ### mix command
