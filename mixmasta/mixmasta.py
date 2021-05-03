@@ -3,7 +3,10 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime
 from typing import List
+
+import geofeather as gf
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -11,8 +14,6 @@ import xarray as xr
 from osgeo import gdal, gdalconst
 from shapely import speedups
 from shapely.geometry import Point
-from datetime import datetime
-import geofeather as gf
 
 if not sys.warnoptions:
     import warnings
@@ -20,6 +21,7 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
 logger = logging.getLogger(__name__)
+
 
 def netcdf2df(netcdf: str) -> pd.DataFrame:
     """
@@ -224,7 +226,7 @@ def format_time(t: str, time_format: str, validate: bool = True) -> int:
 
     try:
         t_ = int(datetime.strptime(t, time_format).timestamp())
-        
+
         return t_
     except Exception as e:
         print(e)
@@ -232,6 +234,7 @@ def format_time(t: str, time_format: str, validate: bool = True) -> int:
             raise Exception(e)
         else:
             return None
+
 
 def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     """
@@ -252,18 +255,28 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     --------
     >>> df_norm = normalizer(df, mapper, 'admin3')
     """
-    col_order = ['timestamp','country','admin1','admin2','admin3','lat','lng','feature','value']
-    
+    col_order = [
+        "timestamp",
+        "country",
+        "admin1",
+        "admin2",
+        "admin3",
+        "lat",
+        "lng",
+        "feature",
+        "value",
+    ]
+
     # subset dataframe for only columns in mapper
-    time_cols = [kk for kk, vv in mapper.items() if vv['Primary_time'] == 'true']
-    geo_cols = [kk for kk, vv in mapper.items() if vv['Primary_geo'] == 'true']
+    time_cols = [kk for kk, vv in mapper.items() if vv["Primary_time"] == "true"]
+    geo_cols = [kk for kk, vv in mapper.items() if vv["Primary_geo"] == "true"]
     df = df[list(mapper.keys())]
 
     # Rename protected columns
     # and perform type conversion on the time column
     features = []
     for kk, vv in mapper.items():
-        
+
         if kk in time_cols:
             df[kk] = df[kk].apply(
                 lambda x: format_time(x, vv["Time_format"], validate=False)
@@ -278,16 +291,16 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 staple_col_name = "lng"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
             elif vv["Geo"] == "Coordinates":
-                c_f = vv['Coordinate_format']
+                c_f = vv["Coordinate_format"]
                 cords = df[kk].values
-                if c_f == 'Longitude,Latitude':
-                    lats = [x for x in cords.split(',')[1]]
-                    longs = [x for x in cords.split(',')[0]]
+                if c_f == "Longitude,Latitude":
+                    lats = [x for x in cords.split(",")[1]]
+                    longs = [x for x in cords.split(",")[0]]
                 else:
-                    lats = [x for x in cords.split(',')[0]]
-                    longs = [x for x in cords.split(',')[1]]
-                df['lng'] = longs
-                df['lat'] = lats
+                    lats = [x for x in cords.split(",")[0]]
+                    longs = [x for x in cords.split(",")[1]]
+                df["lng"] = longs
+                df["lat"] = lats
                 del df[kk]
         else:
             features.append(kk)
@@ -320,22 +333,29 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     print(df_out.head())
     return df_out[col_order]
 
+
 def process(fp: str, mp: str, admin: str, output_file: str):
     mapper = json.loads(open(mp).read())
-    transform = mapper['meta']
-    mapper = mapper['annotations']
-    
-    if transform['ftype'] == 'Geotiff':
-        if transform['Date'] == "":
+    transform = mapper["meta"]
+    mapper = mapper["annotations"]
+
+    if transform["ftype"] == "Geotiff":
+        if transform["Date"] == "":
             d = None
         else:
-            d = transform['Date']
-        df = raster2df(fp, transform['Feature_name'], int(transform['Band']), int(transform['Null_val']), d)
+            d = transform["Date"]
+        df = raster2df(
+            fp,
+            transform["Feature_name"],
+            int(transform["Band"]),
+            int(transform["Null_val"]),
+            d,
+        )
 
-    elif transform['ftype'] != 'csv':
+    elif transform["ftype"] != "csv":
         df = netcdf2df(fp)
     else:
         df = pd.read_csv(fp)
 
     norm = normalizer(df, mapper, admin)
-    norm.to_parquet(f'{output_file}.parquet.gzip', compression='gzip')
+    norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
