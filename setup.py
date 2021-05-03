@@ -34,7 +34,7 @@ setup(
     description="A library for common scientific model transforms",
     entry_points={
         'console_scripts': [
-            'mixmasta=mixmasta.cli:main',
+            'mixmasta=mixmasta.cli:cli',
         ],
     },
     setup_requires=['numpy>=1.20.1'], # This is not working as expected

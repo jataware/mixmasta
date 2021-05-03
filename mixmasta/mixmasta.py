@@ -252,6 +252,8 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     --------
     >>> df_norm = normalizer(df, mapper, 'admin3')
     """
+    col_order = ['timestamp','country','admin1','admin2','admin3','lat','lng','feature','value']
+    
     # subset dataframe for only columns in mapper
     time_cols = [kk for kk, vv in mapper.items() if vv['Primary_time'] == 'true']
     geo_cols = [kk for kk, vv in mapper.items() if vv['Primary_geo'] == 'true']
@@ -260,15 +262,12 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     # Rename protected columns
     # and perform type conversion on the time column
     features = []
-    print('time_cols',time_cols)
     for kk, vv in mapper.items():
         
         if kk in time_cols:
-            print('time', kk)
             df[kk] = df[kk].apply(
                 lambda x: format_time(x, vv["Time_format"], validate=False)
             )
-            print(df[kk].head(5))
             staple_col_name = "timestamp"
             df.rename(columns={kk: staple_col_name}, inplace=True)
         elif kk in geo_cols:
@@ -314,12 +313,15 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             df_out = df_
         else:
             df_out = df_out.append(df_)
-    print('head', df_out.head())
-    print('len', len(df_out))
 
-    return df_out
+    for c in col_order:
+        if c not in df_out:
+            df_out[c] = None
+    print(df_out.head())
+    return df_out[col_order]
 
-def process(fp, mapper: dict, admin: str):
+def process(fp: str, mp: str, admin: str, output_file: str):
+    mapper = json.loads(open(mp).read())
     transform = mapper['meta']
     mapper = mapper['annotations']
     
@@ -335,4 +337,5 @@ def process(fp, mapper: dict, admin: str):
     else:
         df = pd.read_csv(fp)
 
-    return normalizer(df, mapper, admin)
+    norm = normalizer(df, mapper, admin)
+    norm.to_parquet(f'{output_file}.parquet.gzip', compression='gzip')
