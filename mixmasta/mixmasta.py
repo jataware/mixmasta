@@ -358,4 +358,15 @@ def process(fp: str, mp: str, admin: str, output_file: str):
         df = pd.read_csv(fp)
 
     norm = normalizer(df, mapper, admin)
+
+    # Clean up mixed column types; convert them all to str
+    for col in norm.columns:
+        mixed_type = (norm[[col]].applymap(type) != norm[[col]].iloc[0].apply(type)).any(axis=1)
+        if len(norm[mixed_type]) > 0:
+            print(col)
+            norm[col] = norm[col].astype(str)
+
+        if norm[col].dtype == list:
+            norm[col] = norm[col].astype(str)      
+              
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
