@@ -279,7 +279,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
 
         if kk in time_cols:
             df[kk] = df[kk].apply(
-                lambda x: format_time(x, vv["Time_format"], validate=False)
+                lambda x: format_time(str(x), vv["Time_format"], validate=False)
             )
             staple_col_name = "timestamp"
             df.rename(columns={kk: staple_col_name}, inplace=True)
