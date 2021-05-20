@@ -358,4 +358,13 @@ def process(fp: str, mp: str, admin: str, output_file: str):
         df = pd.read_csv(fp)
 
     norm = normalizer(df, mapper, admin)
+
+    # Separate string values from others
+    norm['type'] = norm[['value']].applymap(type)   
+    norm_str = norm[norm['type']==str]
+    norm = norm[norm['type']!=str]
+    del(norm_str['type'])
+    del(norm['type'])    
+              
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
+    norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
