@@ -196,9 +196,9 @@ def geocode(
     gdf = gpd.GeoDataFrame(df)
 
     # Spatial merge on GADM to obtain admin areas
-    gdf = gpd.sjoin(gdf, gadm, how="left", op="within")
+    gdf = gpd.sjoin(gdf, gadm, how="left", op="within", lsuffix="mixmasta_left", rsuffix="mixmasta_geocoded")
     del gdf["geometry"]
-    del gdf["index_right"]
+    del gdf["index_mixmasta_geocoded"]
 
     return pd.DataFrame(gdf)
 
@@ -303,29 +303,51 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 df["lat"] = lats
                 del df[kk]
         else:
-            if vv["Geo"] == "Country":
-                df["country"] = df[kk]
-                continue
-            if vv["Geo"] == "State/Territory":
-                df["admin1"] = df[kk]
-                continue
-            if vv["Geo"] == "County/District":
-                df["admin2"] = df[kk]
-                continue
-            if vv["Geo"] == "Municipality/Town":
-                df["admin3"] = df[kk]                
-                continue
+            # only push geo columns to the named columns
+            # in the event there is no primary geo
+            # otherwise they are features and we geocode lat/lng
+            if len(geo_cols) == 0:
+                if vv["Geo"] == "Country":
+                    df["country"] = df[kk]
+                    continue
+                if vv["Geo"] == "State/Territory":
+                    df["admin1"] = df[kk]
+                    continue
+                if vv["Geo"] == "County/District":
+                    df["admin2"] = df[kk]
+                    continue
+                if vv["Geo"] == "Municipality/Town":
+                    df["admin3"] = df[kk]                
+                    continue
             features.append(kk)
 
     # perform geocoding if lat/lng are present
     if "lat" in df and "lng" in df:
         df = geocode(admin, df, x="lng", y="lat")
-
-    # reshape the dataframe into a "long" format
-    protected_cols = list(set(df.columns) - set(features))
+    
+    df_geo_cols = [i for i in df.columns if 'mixmasta_geocoded' in i]
+    for c in df_geo_cols:
+        df.rename(columns={c: c.replace('_mixmasta_geocoded','')}, inplace=True)
+    
+    required_cols = [
+        "timestamp",
+        "country",
+        "admin1",
+        "admin2",
+        "admin3",
+        "lat",
+        "lng",
+    ]
+    
+    protected_cols = list(set(required_cols) & set(df.columns))
     df_out = pd.DataFrame()
     for feat in features:
-        df_ = df[protected_cols + [feat]].copy()
+        join_overlap = False
+        try:
+            df_ = df[protected_cols + [feat+'_mixmasta_left']].copy()
+            join_overlap = True
+        except:            
+            df_ = df[protected_cols + [feat]].copy()            
         try:
             if mapper[feat]["new_col_name"] == None:
                 df_["feature"] = feat
@@ -333,7 +355,10 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 df_["feature"] = mapper[feat]["new_col_name"]
         except:
             df_["feature"] = feat
-        df_.rename(columns={feat: "value"}, inplace=True)
+        if join_overlap:
+            df_.rename(columns={f"{feat}_mixmasta_left": "value"}, inplace=True)
+        else:
+            df_.rename(columns={feat: "value"}, inplace=True)
         if len(df_out) == 0:
             df_out = df_
         else:
