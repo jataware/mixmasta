@@ -13,10 +13,12 @@ RUN apt install -y python3-rtree
 ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
 ENV C_INCLUDE_PATH=/usr/include/gdal
 
-WORKDIR /
-
 RUN pip3 install numpy==1.20.1
-RUN pip3 install mixmasta==0.5.1
+
+WORKDIR /
+COPY . /
+RUN pip3 install -r requirements.txt
+RUN python3 setup.py install
 RUN mixmasta download
 
 ENTRYPOINT ["mixmasta"]

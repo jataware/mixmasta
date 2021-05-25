@@ -181,3 +181,7 @@ This command takes in a data file and a mapper file and converts it into a Cause
 
   - type=str
   - default=`mixmasta_output` (which writes a file to `mixmasta_output.parquet.gzip`)
+
+### Testing
+
+In `examples/causemosify-tests` you can run bash `bash test_file_1.sh` and `bash test_file_2.sh` to Causemosify two files. This assumes you have a container called `mixmasta` locally. You can build this from the top of the repo with `docker build -t mixmasta .`
