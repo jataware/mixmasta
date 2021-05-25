@@ -303,6 +303,18 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 df["lat"] = lats
                 del df[kk]
         else:
+            if vv["Geo"] == "Country":
+                df["country"] = df[kk]
+                continue
+            if vv["Geo"] == "State/Territory":
+                df["admin1"] = df[kk]
+                continue
+            if vv["Geo"] == "County/District":
+                df["admin2"] = df[kk]
+                continue
+            if vv["Geo"] == "Municipality/Town":
+                df["admin3"] = df[kk]                
+                continue
             features.append(kk)
 
     # perform geocoding if lat/lng are present
@@ -369,3 +381,4 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
         norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
+    return norm
