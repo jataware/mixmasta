@@ -1,5 +1,5 @@
 docker run --rm -v $PWD:/tmp \
-           mixmasta-local \
+           mixmasta \
            causemosify \
            --input_file=/tmp/test_file_1.csv \
            --mapper=/tmp/test_file_1.json \
