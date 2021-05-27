@@ -269,6 +269,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
 
     # subset dataframe for only columns in mapper
     time_cols = [kk for kk, vv in mapper.items() if vv["Primary_time"] == "true"]
+    other_time_cols = [kk for kk, vv in mapper.items() if vv["Type"] == "DATE/TIME" and vv["Primary_time"] != "true"]
     geo_cols = [kk for kk, vv in mapper.items() if vv["Primary_geo"] == "true"]
     df = df[list(mapper.keys())]
 
@@ -319,6 +320,13 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 if vv["Geo"] == "Municipality/Town":
                     df["admin3"] = df[kk]                
                     continue
+            
+            # Convert all date/time to epoch time.
+            if kk in other_time_cols:
+                df[kk] = df[kk].apply(
+                    lambda x: format_time(str(x), vv["Time_format"], validate=False)
+                )
+
             features.append(kk)
 
     # perform geocoding if lat/lng are present
@@ -359,10 +367,19 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             df_.rename(columns={f"{feat}_mixmasta_left": "value"}, inplace=True)
         else:
             df_.rename(columns={feat: "value"}, inplace=True)
+
+        # Add feature/value for epochtime as object adds it without decimal
+        # places, but it is still saved as a double in the parquet file.
         if len(df_out) == 0:
-            df_out = df_
+            if feat in other_time_cols:
+                df_out = df_.astype({'value': object})
+            else:
+                df_out = df_
         else:
-            df_out = df_out.append(df_)
+            if feat in other_time_cols:
+                df_out = df_out.append(df_.astype({'value': object}))
+            else:
+                df_out = df_out.append(df_)
 
     for c in col_order:
         if c not in df_out:
@@ -402,7 +419,10 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     norm = norm[norm['type']!=str]
     del(norm_str['type'])
     del(norm['type'])    
-              
+
+    #print(norm.head())
+    #print(norm_str.head())
+
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
         norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
