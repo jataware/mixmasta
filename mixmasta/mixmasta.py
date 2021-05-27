@@ -277,11 +277,13 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     # and perform type conversion on the time column
     features = []
     for kk, vv in mapper.items():
-
+               
         if kk in time_cols:
-            df[kk] = df[kk].apply(
-                lambda x: format_time(str(x), vv["Time_format"], validate=False)
-            )
+            # convert primary_time to epochtime if not already.
+            if vv["Time"] == "Date":
+                df[kk] = df[kk].apply(
+                    lambda x: format_time(str(x), vv["Time_format"], validate=False)
+                )
             staple_col_name = "timestamp"
             df.rename(columns={kk: staple_col_name}, inplace=True)
         elif kk in geo_cols:
@@ -321,8 +323,8 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                     df["admin3"] = df[kk]                
                     continue
             
-            # Convert all date/time to epoch time.
-            if kk in other_time_cols:
+            # Convert all date/time to epoch time if not already.
+            if kk in other_time_cols and vv["Time"] == "Date":
                 df[kk] = df[kk].apply(
                     lambda x: format_time(str(x), vv["Time_format"], validate=False)
                 )
