@@ -203,6 +203,44 @@ def geocode(
     return pd.DataFrame(gdf)
 
 
+def generate_timestamp(row, date_mapper):
+    """
+    Description
+    -----------
+    Generates a pandas series in M/D/Y format from collect Month, Day, Year
+    values in a parameter pandas series. Fills Month, Day or Year if missing, 
+    but at least one should be present. Used to generate a timestamp in the 
+    absence of one in the data.
+
+    Parameters
+    ----------
+    row: pd.Series
+        a pandas series containing date data
+    date_mapper: dict
+        a schema mapping (JSON) for the dataframe filtered for "Time" equal to
+        Day, Month, or Year.
+        
+    Examples
+    --------
+    This example adds the generated series to the source dataframe.
+    >>> df = df.join(df.apply(generate_timestamp, date_mapper=date_mapper
+        , axis=1))
+    """
+    day = 1
+    month = 1
+    year = 70
+    for kk, vv in date_mapper.items():
+        if vv["Time"] == "Day":
+            day = row[kk]
+        elif vv["Time"] == "Month":
+            month = row[kk]
+        elif vv["Time"] == "Year":
+            year = str(row[kk])[-2:]
+
+    return pd.Series(['{}/{}/{}'.format(month,day,year)], index=['timestamp'])
+
+    
+
 def format_time(t: str, time_format: str, validate: bool = True) -> int:
     """
     Description
@@ -269,7 +307,9 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
 
     # subset dataframe for only columns in mapper
     time_cols = [kk for kk, vv in mapper.items() if vv["Primary_time"] == "true"]
-    other_time_cols = [kk for kk, vv in mapper.items() if vv["Type"] == "DATE/TIME" and vv["Primary_time"] != "true"]
+    other_time_cols = [kk for kk, vv in mapper.items() 
+        if vv["Type"] == "DATE/TIME" and vv["Primary_time"] != "true"
+        ]
     geo_cols = [kk for kk, vv in mapper.items() if vv["Primary_geo"] == "true"]
     df = df[list(mapper.keys())]
 
@@ -277,7 +317,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     # and perform type conversion on the time column
     features = []
     for kk, vv in mapper.items():
-               
+        
         if kk in time_cols:
             # convert primary_time to epochtime if not already.
             if vv["Time"] == "Date":
@@ -348,6 +388,19 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         "lat",
         "lng",
     ]
+
+    # if there is no primary_time column for timestamp, attempt to generate
+    # from Time= Month, Day or Year features.
+    if len(time_cols) == 0 and len(other_time_cols) > 0:   
+        date_mapper = {k: v for k, v in mapper.items() if "Time" in v 
+            and v["Time"] in ["Month", "Day", "Year"]}
+        if date_mapper:
+            df = df.join(df.apply(generate_timestamp, date_mapper=date_mapper, 
+                axis=1))
+            # It might be optimal to include format_time in generate_timestamp 
+            # and skip the next line.
+            df['timestamp'] = df['timestamp'].apply(lambda x: format_time(str(x)
+                , "%m/%d/%y", validate=False))
     
     protected_cols = list(set(required_cols) & set(df.columns))
     df_out = pd.DataFrame()
