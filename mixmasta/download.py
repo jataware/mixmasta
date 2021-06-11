@@ -73,6 +73,7 @@ def download_and_clean(
     download_data_folder = f"{cdir}/{dirname}"
 
     test_if_exist = f"{download_data_folder}/{gadm_fn}"
+    print(test_if_exist)
     if os.path.exists(test_if_exist):
         print(f"{test_if_exist} already downloaded")
 

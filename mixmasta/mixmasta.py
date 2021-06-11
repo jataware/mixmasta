@@ -10,11 +10,18 @@ import geofeather as gf
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import requests
 import xarray as xr
 from osgeo import gdal, gdalconst
 from shapely import speedups
 from shapely.geometry import Point
 
+
+import fuzzywuzzy
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
+import timeit
+#
 if not sys.warnoptions:
     import warnings
 
@@ -132,6 +139,119 @@ def raster2df(
     return df
 
 
+def ping_isi(country_list: list):
+    with open('report.xls', 'rb') as f:
+        r = requests.post('http://httpbin.org/post', files={'report.xls': f})
+
+    # Not found in pycountry. Use isi.
+    """try:
+        endpoint = "https://dsbox02.isi.edu:8888/wikifier/wikify?columns=Country"
+        response = requests.get(endpoint)
+         resp = response.json()
+
+        
+    except Exception as e:
+        print(e)
+    """
+    
+
+def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
+    """
+        Assumption: Country was selected by drop-down on file submission.
+
+    Parameters
+    ----------
+    admin: str
+        the level to geocode to. Either 'admin2' or 'admin3'
+    df: pandas.DataFrame
+        the uploaded dataframe
+
+    Result
+    ------
+    A pandas.Dataframe produced by modifying the parameter df.
+    
+
+    Examples
+    --------
+    Match geo names for a dataframe without columns named 'lat' and 'lon'
+
+    >>> df = match_geo_names(admin, df)
+
+    """
+    flag = speedups.available
+    if flag == True:
+        speedups.enable()
+
+    cdir = os.path.expanduser("~")
+    download_data_folder = f"{cdir}/mixmasta_data"
+
+    start_time = timeit.default_timer()
+
+    if admin == "admin2":        
+        gadm_fn = f"gadm36_2.feather"
+    else:
+        gadm_fn = f"gadm36_3.feather"
+
+    gadmDir = f"{download_data_folder}/{gadm_fn}"
+    gadm = gf.from_geofeather(gadmDir)
+
+    gadm["country"] = gadm["NAME_0"]
+    gadm["state"]   = gadm["NAME_1"]
+    gadm["admin1"]  = gadm["NAME_1"]
+    gadm["admin2"]  = gadm["NAME_2"]
+
+    if admin == "admin2":
+        gadm = gadm[["country", "state", "admin1", "admin2"]]
+    else:
+        gadm["admin3"] = gadm["NAME_3"]
+        gadm = gadm[["country", "state", "admin1", "admin2", "admin3"]]
+        
+    print('load time', timeit.default_timer() - start_time)
+    start_time = timeit.default_timer()
+
+    # Filter GADM for countries in df.
+    countries = df["country"].unique()
+    gadm = gadm[gadm["country"].isin(countries)]
+
+    for c in countries: 
+        # The following ignores admin1 / admin2 pairs; it only cares if those
+        # values exist for the appropriate country.
+
+        # Get list of admin1 values in df but not in gadm. Reduce list for country.           
+        admin1_list = gadm[gadm.country==c]["admin1"].unique()    
+        if not admin1_list.any(None) and admin1_list != None:
+            unknowns = df[(df.country == c) & ~df.admin1.isin(admin1_list)].admin1.tolist()
+            unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
+            for unk in unknowns:
+                match = fuzzywuzzy.process.extractOne(unk, admin1_list, scorer=fuzz.ratio)
+                if match != None:
+                    df.loc[df.admin1 == unk, 'admin1'] = match[0]
+
+        # Get list of admin2 values in df but not in gadm. Reduce list for country.           
+        admin2_list = gadm[gadm.country==c ]["admin2"].unique()
+        if not admin2_list.any(None) and admin2_list != None:
+            unknowns = df[(df.country == c) & ~df.admin2.isin(admin2_list)].admin2.tolist()
+            unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
+            for unk in unknowns:
+                match = fuzzywuzzy.process.extractOne(unk, admin2_list, scorer=fuzz.ratio)
+                if match != None:
+                    df.loc[df.admin2 == unk, 'admin2'] = match[0]
+
+        if admin =='admin3':
+            # Get list of admin3 values in df but not in gadm. Reduce list for country.           
+            admin3_list = gadm[gadm.country==c]["admin3"].unique()       
+            if not admin3_list.any(None) and admin3_list != None:
+                unknowns = df[(df.country == c) & ~df.admin3.isin(admin3_list)].admin3.tolist()
+                unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
+                for unk in unknowns:                
+                    match = fuzzywuzzy.process.extractOne(unk, admin3_list, scorer=fuzz.ratio)
+                    if match != None:
+                        df.loc[df.admin3 == unk, 'admin3'] = match[0]
+    
+    print('processing time', timeit.default_timer() - start_time)
+        
+    return df
+
 def geocode(
     admin: str, df: pd.DataFrame, x: str = "longitude", y: str = "latitude"
 ) -> pd.DataFrame:
@@ -160,6 +280,7 @@ def geocode(
     >>> df = geocode(df, x='lon', y='lat')
 
     """
+
     flag = speedups.available
     if flag == True:
         speedups.enable()
@@ -178,8 +299,7 @@ def geocode(
         gadm["admin1"] = gadm["NAME_1"]
         gadm["admin2"] = gadm["NAME_2"]
         gadm = gadm[["geometry", "country", "state", "admin1", "admin2"]]
-
-    if admin == "admin3":
+    elif admin == "admin3":
 
         gadm_fn = f"gadm36_3.feather"
         gadmDir = f"{download_data_folder}/{gadm_fn}"
@@ -191,6 +311,7 @@ def geocode(
         gadm["admin2"] = gadm["NAME_2"]
         gadm["admin3"] = gadm["NAME_3"]
         gadm = gadm[["geometry", "country", "state", "admin1", "admin2", "admin3"]]
+
 
     df["geometry"] = df.apply(lambda row: Point(row[x], row[y]), axis=1)
     gdf = gpd.GeoDataFrame(df)
@@ -207,10 +328,11 @@ def generate_timestamp(row, date_mapper):
     """
     Description
     -----------
-    Generates a pandas series in M/D/Y format from collect Month, Day, Year
-    values in a parameter pandas series. Fills Month, Day or Year if missing, 
-    but at least one should be present. Used to generate a timestamp in the 
-    absence of one in the data.
+    Generates a pandas series in M/D/Y H:M format from collect Month, Day, 
+    Year, Hour, Minute values in a parameter pandas series. Fills Month, Day, 
+    Year, Hour, Minute if missing, but at least one should be present to 
+    generate the value. Used to generate a timestamp in the absence of one in 
+    the data.
 
     Parameters
     ----------
@@ -226,9 +348,14 @@ def generate_timestamp(row, date_mapper):
     >>> df = df.join(df.apply(generate_timestamp, date_mapper=date_mapper
         , axis=1))
     """
+
+    # Default to 1/1/1970 00:01
     day = 1
     month = 1
     year = 70
+    hour = 0
+    minute = 1
+
     for kk, vv in date_mapper.items():
         if vv["Time"] == "Day":
             day = row[kk]
@@ -236,10 +363,13 @@ def generate_timestamp(row, date_mapper):
             month = row[kk]
         elif vv["Time"] == "Year":
             year = str(row[kk])[-2:]
+        elif vv["Time"] == "Hour":
+            hour = row[kk]
+        elif vv["Time"] == "Minute":
+            minute = row[kk]
 
-    return pd.Series(['{}/{}/{}'.format(month,day,year)], index=['timestamp'])
+    return pd.Series(['{}/{}/{} {}:{}'.format(month,day,year,hour,minute)], index=['timestamp'])
 
-    
 
 def format_time(t: str, time_format: str, validate: bool = True) -> int:
     """
@@ -350,8 +480,8 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             # in the event there is no primary geo
             # otherwise they are features and we geocode lat/lng
             if len(geo_cols) == 0:
-                if vv["Geo"] == "Country":
-                    df["country"] = df[kk]
+                if vv["Geo"] == "Country":                    
+                    df["country"] = df[kk]                  
                     continue
                 if vv["Geo"] == "State/Territory":
                     df["admin1"] = df[kk]
@@ -371,10 +501,15 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
 
             features.append(kk)
 
+
     # perform geocoding if lat/lng are present
     if "lat" in df and "lng" in df:
         df = geocode(admin, df, x="lng", y="lat")
-    
+    elif len(geo_cols) == 0 and "country" in df:
+        # Correct any misspellings etc. in state and admin areas.
+        df = match_geo_names(admin, df)
+        #pass
+
     df_geo_cols = [i for i in df.columns if 'mixmasta_geocoded' in i]
     for c in df_geo_cols:
         df.rename(columns={c: c.replace('_mixmasta_geocoded','')}, inplace=True)
@@ -439,7 +574,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     for c in col_order:
         if c not in df_out:
             df_out[c] = None
-    print(df_out.head())
+    print(df_out.head(10))
     return df_out[col_order]
 
 
@@ -482,3 +617,13 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     if len(norm_str) > 0:
         norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
     return norm
+
+
+
+# testing rtk
+
+#mp = 'examples/causemosify-tests/acled.json'
+#fp = 'examples/causemosify-tests/acled.csv'
+#geo = 'admin3'
+#outf = 'examples/causemosify-tests/acled'
+#process(fp, mp, geo, outf)
