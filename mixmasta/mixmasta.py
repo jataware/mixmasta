@@ -616,14 +616,5 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
         norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
-    return norm
+    return norm.append(norm_str)
 
-
-
-# testing rtk
-
-#mp = 'examples/causemosify-tests/acled.json'
-#fp = 'examples/causemosify-tests/acled.csv'
-#geo = 'admin3'
-#outf = 'examples/causemosify-tests/acled'
-#process(fp, mp, geo, outf)
