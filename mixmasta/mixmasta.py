@@ -185,7 +185,7 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
     cdir = os.path.expanduser("~")
     download_data_folder = f"{cdir}/mixmasta_data"
 
-    start_time = timeit.default_timer()
+    #start_time = timeit.default_timer()
 
     if admin == "admin2":        
         gadm_fn = f"gadm36_2.feather"
@@ -206,8 +206,8 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
         gadm["admin3"] = gadm["NAME_3"]
         gadm = gadm[["country", "state", "admin1", "admin2", "admin3"]]
         
-    print('load time', timeit.default_timer() - start_time)
-    start_time = timeit.default_timer()
+    #print('load time', timeit.default_timer() - start_time)
+    #start_time = timeit.default_timer()
 
     # Filter GADM for countries in df.
     countries = df["country"].unique()
@@ -248,7 +248,7 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
                     if match != None:
                         df.loc[df.admin3 == unk, 'admin3'] = match[0]
     
-    print('processing time', timeit.default_timer() - start_time)
+    #print('processing time', timeit.default_timer() - start_time)
         
     return df
 
@@ -416,6 +416,21 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         a pandas dataframe containing point data
     mapper: dict
         a schema mapping (JSON) for the dataframe
+        a dict where keys will be geo, feaure, date, and values will be lists of dict
+        example:
+        { 'geo': [
+             {'name': 'country', 'type': 'geo', 'geo_type': 'country', 'primary_geo': False}, 
+             {'name': 'state', 'type': 'geo', 'geo_type': 'state/territory', 'primary_geo': False}
+           ], 
+           'feature': [
+              {'name': 'probabilty', 'type': 'feature', 'feature_type': 'float'}, 
+              {'name': 'color', 'type': 'feature', 'feature_type': 'str'}
+            ], 
+            'date': [
+               {'name': 'date_2', 'type': 'date', 'date_type': 'date', 'primary_date': False, 'time_format': '%m/%d/%y'}, 
+               {'name': 'date', 'type': 'date', 'date_type': 'date', 'primary_date': True, 'time_format': '%m/%d/%y'}
+            ]
+        }
     admin: str, default 'admin2'
         the level to geocode to. Either 'admin2' or 'admin3'
 
@@ -435,43 +450,60 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         "value",
     ]
 
+    # mapper is a dictionary of lists of dictionaries.
+    
+    
+    time_cols = [k['name'] for k in mapper['date'] if k['primary_date'] == True]
+    other_time_cols = [k['name'] for k in mapper['date'] if k['primary_date'] == False]
+    
+    geo_cols = [k["name"] for k in mapper["geo"] if k["primary_geo"] == True]
+
     # subset dataframe for only columns in mapper
-    time_cols = [kk for kk, vv in mapper.items() if vv["Primary_time"] == "true"]
-    other_time_cols = [kk for kk, vv in mapper.items() 
-        if vv["Type"] == "DATE/TIME" and vv["Primary_time"] != "true"
-        ]
-    geo_cols = [kk for kk, vv in mapper.items() if vv["Primary_geo"] == "true"]
-    df = df[list(mapper.keys())]
+    mapper_keys = []
+    for k in mapper.items():
+        mapper_keys.extend([l['name'] for l in k[1]])
+    df = df[mapper_keys]
 
     # Rename protected columns
     # and perform type conversion on the time column
     features = []
-    for kk, vv in mapper.items():
-        
+
+    for date_dict in mapper["date"]:
+        kk = date_dict["name"]
         if kk in time_cols:
             # convert primary_time to epochtime if not already.
-            if vv["Time"] == "Date":
+            if date_dict["date_type"] == "date":
                 df[kk] = df[kk].apply(
-                    lambda x: format_time(str(x), vv["Time_format"], validate=False)
+                    lambda x: format_time(str(x), date_dict["time_format"], validate=False)
                 )
             staple_col_name = "timestamp"
             df.rename(columns={kk: staple_col_name}, inplace=True)
-        elif kk in geo_cols:
-            if vv["Geo"] == "Latitude":
+        else:
+            # Convert all date/time to epoch time if not already.
+            if kk in other_time_cols and date_dict["date_type"] == "date":
+                df[kk] = df[kk].apply(
+                    lambda x: format_time(str(x), date_dict["time_format"], validate=False)
+                )
+            features.append(kk)  
+
+    for geo_dict in mapper["geo"]:
+        kk = geo_dict["name"]
+        if kk in geo_cols:
+            if geo_dict["geo_type"] == "latitude":
                 staple_col_name = "lat"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-            elif vv["Geo"] == "Longitude":
+            elif geo_dict["geo_type"] == "longitude":
                 staple_col_name = "lng"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-            elif vv["Geo"] == "Coordinates":
-                c_f = vv["Coordinate_format"]
-                cords = df[kk].values
-                if c_f == "Longitude,Latitude":
-                    lats = [x for x in cords.split(",")[1]]
-                    longs = [x for x in cords.split(",")[0]]
+            elif geo_dict["geo_type"] == "coordinates":
+                c_f = geo_dict["coord_format"]
+                coords = df[kk].values
+                if c_f == "lonlat":
+                    lats = [x for x in coords.split(",")[1]]
+                    longs = [x for x in coords.split(",")[0]]
                 else:
-                    lats = [x for x in cords.split(",")[0]]
-                    longs = [x for x in cords.split(",")[1]]
+                    lats = [x for x in coords.split(",")[0]]
+                    longs = [x for x in coords.split(",")[1]]
                 df["lng"] = longs
                 df["lat"] = lats
                 del df[kk]
@@ -480,27 +512,22 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             # in the event there is no primary geo
             # otherwise they are features and we geocode lat/lng
             if len(geo_cols) == 0:
-                if vv["Geo"] == "Country":                    
+                if geo_dict["geo_type"] == "country":                    
                     df["country"] = df[kk]                  
                     continue
-                if vv["Geo"] == "State/Territory":
+                if geo_dict["geo_type"] == "state/territory":
                     df["admin1"] = df[kk]
                     continue
-                if vv["Geo"] == "County/District":
+                if geo_dict["geo_type"] == "county/district":
                     df["admin2"] = df[kk]
                     continue
-                if vv["Geo"] == "Municipality/Town":
+                if geo_dict["geo_type"] == "municipality/town":
                     df["admin3"] = df[kk]                
                     continue
-            
-            # Convert all date/time to epoch time if not already.
-            if kk in other_time_cols and vv["Time"] == "Date":
-                df[kk] = df[kk].apply(
-                    lambda x: format_time(str(x), vv["Time_format"], validate=False)
-                )
-
             features.append(kk)
 
+    # Append columns annotated in feature dict to features list.
+    features.extend([k["name"] for k in mapper["feature"] ])
 
     # perform geocoding if lat/lng are present
     if "lat" in df and "lng" in df:
@@ -508,7 +535,6 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     elif len(geo_cols) == 0 and "country" in df:
         # Correct any misspellings etc. in state and admin areas.
         df = match_geo_names(admin, df)
-        #pass
 
     df_geo_cols = [i for i in df.columns if 'mixmasta_geocoded' in i]
     for c in df_geo_cols:
@@ -527,8 +553,8 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     # if there is no primary_time column for timestamp, attempt to generate
     # from Time= Month, Day or Year features.
     if len(time_cols) == 0 and len(other_time_cols) > 0:   
-        date_mapper = {k: v for k, v in mapper.items() if "Time" in v 
-            and v["Time"] in ["Month", "Day", "Year"]}
+        date_mapper = {d for d in mapper["date"] if d["date_type"] 
+            in ["month", "day", "year"]}
         if date_mapper:
             df = df.join(df.apply(generate_timestamp, date_mapper=date_mapper, 
                 axis=1))
@@ -574,14 +600,25 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     for c in col_order:
         if c not in df_out:
             df_out[c] = None
-    print(df_out.head(10))
+    
     return df_out[col_order]
 
 
 def process(fp: str, mp: str, admin: str, output_file: str):
+    """
+    Parameters
+    ----------
+    mp: str
+        Filename for JSON mapper from spacetag.
+        Schema: https://github.com/jataware/spacetag/blob/schema/schema.py
+        Example: https://github.com/jataware/spacetag/blob/schema/example.json
+
+    """
     mapper = json.loads(open(mp).read())
     transform = mapper["meta"]
-    mapper = mapper["annotations"]
+
+    # Make mapper contain only keys for date, geo, and feature.
+    mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 
     if transform["ftype"] == "Geotiff":
         if transform["Date"] == "":
@@ -610,11 +647,17 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     del(norm_str['type'])
     del(norm['type'])    
 
-    #print(norm.head())
-    #print(norm_str.head())
+    #print('\n', norm.head())
+    #print('\n', norm_str.tail(100))
 
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
         norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
     return norm.append(norm_str)
 
+# Testing
+#mp = 'examples/causemosify-tests/acled_schema2.json'
+#fp = 'examples/causemosify-tests/acled.csv'
+#geo = 'admin3'
+#outf = 'examples/causemosify-tests/acled_schema2'
+#process(fp, mp, geo, outf) 
