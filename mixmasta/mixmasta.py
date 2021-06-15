@@ -452,11 +452,10 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
 
     # mapper is a dictionary of lists of dictionaries.
     
+    time_cols = [k['name'] for k in mapper['date'] if 'primary_date' in k and k['primary_date'] == True]
+    other_time_cols = [k['name'] for k in mapper['date'] if 'primary_date' not in k or k['primary_date'] == False]
     
-    time_cols = [k['name'] for k in mapper['date'] if k['primary_date'] == True]
-    other_time_cols = [k['name'] for k in mapper['date'] if k['primary_date'] == False]
-    
-    geo_cols = [k["name"] for k in mapper["geo"] if k["primary_geo"] == True]
+    geo_cols = [k["name"] for k in mapper["geo"] if "primary_geo" in k and k["primary_geo"] == True]
 
     # subset dataframe for only columns in mapper
     mapper_keys = []
@@ -647,8 +646,8 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     del(norm_str['type'])
     del(norm['type'])    
 
-    #print('\n', norm.head())
-    #print('\n', norm_str.tail(100))
+    print('\n', norm.head())
+    print('\n', norm_str.tail(100))
 
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
@@ -656,8 +655,8 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     return norm.append(norm_str)
 
 # Testing
-#mp = 'examples/causemosify-tests/acled_schema2.json'
-#fp = 'examples/causemosify-tests/acled.csv'
-#geo = 'admin3'
-#outf = 'examples/causemosify-tests/acled_schema2'
-#process(fp, mp, geo, outf) 
+mp = 'examples/causemosify-tests/test_file_5_schema2.json'
+fp = 'examples/causemosify-tests/test_file_5_schema2.csv'
+geo = 'admin3'
+outf = 'examples/causemosify-tests/test_file_5_schema2'
+process(fp, mp, geo, outf) 
