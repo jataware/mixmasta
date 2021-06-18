@@ -20,3 +20,4 @@ rasterio>=1.1.0
 xarray==0.16.1
 tqdm>=4.41.1,<5.0.0
 geofeather>=0.3.0
+fuzzywuzzy>=0.18.0 
