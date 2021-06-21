@@ -221,7 +221,7 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
 
         # Get list of admin1 values in df but not in gadm. Reduce list for country.           
         admin1_list = gadm[gadm.country==c]["admin1"].unique()    
-        if not admin1_list.any(None) and admin1_list != None:
+        if admin1_list is not None and all(admin1_list):
             unknowns = df[(df.country == c) & ~df.admin1.isin(admin1_list)].admin1.tolist()
             unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
             for unk in unknowns:
@@ -231,7 +231,7 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
 
         # Get list of admin2 values in df but not in gadm. Reduce list for country.           
         admin2_list = gadm[gadm.country==c ]["admin2"].unique()
-        if not admin2_list.any(None) and admin2_list != None:
+        if admin2_list is not None and all(admin2_list):
             unknowns = df[(df.country == c) & ~df.admin2.isin(admin2_list)].admin2.tolist()
             unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
             for unk in unknowns:
@@ -242,7 +242,7 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
         if admin =='admin3':
             # Get list of admin3 values in df but not in gadm. Reduce list for country.           
             admin3_list = gadm[gadm.country==c]["admin3"].unique()       
-            if not admin3_list.any(None) and admin3_list != None:
+            if admin3_list is not None and all(admin3_list):
                 unknowns = df[(df.country == c) & ~df.admin3.isin(admin3_list)].admin3.tolist()
                 unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
                 for unk in unknowns:                
@@ -683,8 +683,8 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     del(norm_str['type'])
     del(norm['type'])    
 
-    #print('\n', norm.head())
-    #print('\n', norm_str.tail())
+    print('\n', norm.head())
+    print('\n', norm_str.tail())
 
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
