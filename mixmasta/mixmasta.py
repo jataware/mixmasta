@@ -683,8 +683,8 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     del(norm_str['type'])
     del(norm['type'])    
 
-    print('\n', norm.head())
-    print('\n', norm_str.tail())
+    #print('\n', norm.head())
+    #print('\n', norm_str.tail())
 
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
@@ -692,8 +692,8 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     return norm.append(norm_str)
 
 # Testing
-mp = 'examples/causemosify-tests/test_file_5_schema2.json'
-fp = 'examples/causemosify-tests/test_file_5_schema2.csv'
-geo = 'admin3'
-outf = 'examples/causemosify-tests/test_file_5_schema2'
-process(fp, mp, geo, outf) 
+#mp = 'examples/causemosify-tests/test_file_5_schema2.json'
+#fp = 'examples/causemosify-tests/test_file_5_schema2.csv'
+#geo = 'admin3'
+#outf = 'examples/causemosify-tests/test_file_5_schema2'
+#process(fp, mp, geo, outf) 
