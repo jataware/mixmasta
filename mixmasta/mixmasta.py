@@ -525,7 +525,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         if not "timestamp" in df.columns:
             new_column_name = "timestamp"
         else:
-            new_column_name = ''.join(assoc_fields)
+            new_column_name = ''.join(sorted(assoc_fields))
 
         df = df.join(df.apply(generate_timestamp, date_mapper=assoc_columns, column_name=new_column_name, axis=1))
         df[new_column_name] = df[new_column_name].apply(lambda x: format_time(str(x), "%m/%d/%y", validate=False))
