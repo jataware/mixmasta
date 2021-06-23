@@ -464,8 +464,10 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     other_time_cols   = [k['name'] for k in mapper['date'] if 'primary_date' not in k or k['primary_date'] == False]   
     primary_geo_cols  = [k["name"] for k in mapper["geo"]  if "primary_geo"  in k and k["primary_geo"] == True]
 
+    # dictionary for columns qualified by another column.
+    # key: qualified column
+    # value: list of columns that qualifies key column
     qualified_col_dict = {}
-
 
     # subset dataframe for only columns specified in mapper schema.
     mapper_keys = []
@@ -659,15 +661,19 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     # if a field qualifies a protected field like country, it should have data
     # in each row, unlike features below where the qualifying data appears
     # only on those rows.
+    # k: qualified column (str)
+    # v: list of columns (str) that qualify k
     for k,v in qualified_col_dict.items():
-        if v in protected_cols:
-            protected_cols.append(k)
-            col_order(k)
+        if k in protected_cols:
+            # k is qualified by the columns in v, and k is a protected column,
+            # so extend the width of the output dataset with v for each row.
+            protected_cols.extend(v)
+            col_order.extend(v)
 
 
     df_out = pd.DataFrame()
     for feat in features:
-        using_cols = protected_cols
+        using_cols = protected_cols.copy()
 
         if feat in qualified_col_dict:
             # dict value is a list, so extend.
@@ -758,9 +764,9 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     del(norm_str['type'])
     del(norm['type'])    
 
-    print('\n', norm.head(20))
-    print('\n', norm.tail(20))
-    print('\n', norm_str.tail())
+    #print('\n', norm.head(20))
+    #print('\n', norm.tail(20))
+    #print('\n', norm_str.tail())
 
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
@@ -768,8 +774,10 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     return norm.append(norm_str)
 
 # Testing
+"""
 mp = 'examples/causemosify-tests/test_file_5_schema2.json'
 fp = 'examples/causemosify-tests/test_file_5_schema2.csv'
 geo = 'admin3'
 outf = 'examples/causemosify-tests/test_file_5_schema2'
 process(fp, mp, geo, outf) 
+"""
