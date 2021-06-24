@@ -585,9 +585,13 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 df["lng"] = longs
                 df["lat"] = lats
                 del df[kk]
+            elif geo_dict["geo_type"] == "country" and kk != "country":
+                # force the country column to be named country
+                staple_col_name = "country"
+                df.rename(columns={kk: staple_col_name}, inplace=True)                
         elif "qualifies" in geo_dict and geo_dict["qualifies"]:
-            # Note that any “qualifier” column that is not primary geo/date 
-            # will just be lopped on to the right as its own column. It’s 
+            # Note that any "qualifier" column that is not primary geo/date 
+            # will just be lopped on to the right as its own column. It'’'s 
             # column name will just be the name and Uncharted will deal with 
             # it. The key takeaway is that qualifier columns grow the width, 
             # not the length of the dataset.
@@ -626,8 +630,8 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         if "qualifies" not in feature_dict or not feature_dict["qualifies"]:
             features.append(feature_dict["name"])
         elif "qualifies" in feature_dict and feature_dict["qualifies"]: 
-            # Note that any “qualifier” column that is not primary geo/date 
-            # will just be lopped on to the right as its own column. It’s 
+            # Note that any "qualifier" column that is not primary geo/date 
+            # will just be lopped on to the right as its own column. It's 
             # column name will just be the name and Uncharted will deal with 
             # it. The key takeaway is that qualifier columns grow the width, 
             # not the length of the dataset.
@@ -647,7 +651,6 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         df = geocode(admin, df, x="lng", y="lat")
     elif len(primary_geo_cols) == 0 and "country" in df:
         # Correct any misspellings etc. in state and admin areas only when
-        # 
         df = match_geo_names(admin, df)
 
     df_geo_cols = [i for i in df.columns if 'mixmasta_geocoded' in i]
@@ -775,9 +778,9 @@ def process(fp: str, mp: str, admin: str, output_file: str):
 
 # Testing
 """
-mp = 'examples/causemosify-tests/test_file_5_schema2.json'
-fp = 'examples/causemosify-tests/test_file_5_schema2.csv'
+mp = 'examples/causemosify-tests/to_validate.json'
+fp = 'examples/causemosify-tests/raw_data.csv'
 geo = 'admin3'
-outf = 'examples/causemosify-tests/test_file_5_schema2'
+outf = 'examples/causemosify-tests/spacetag_test'
 process(fp, mp, geo, outf) 
 """
