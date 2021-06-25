@@ -21,7 +21,9 @@ import fuzzywuzzy
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 import timeit
-#
+from spacetag_schema import SpaceModel
+
+
 if not sys.warnoptions:
     import warnings
 
@@ -470,9 +472,10 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     qualified_col_dict = {}
 
     # subset dataframe for only columns specified in mapper schema.
+    # get all named objects in the date, feature, geo schema lists.
     mapper_keys = []
     for k in mapper.items():
-        mapper_keys.extend([l['name'] for l in k[1]])
+        mapper_keys.extend([l['name'] for l in k[1] if 'name' in l])
     df = df[mapper_keys]
 
     # Rename protected columns
@@ -734,7 +737,14 @@ def process(fp: str, mp: str, admin: str, output_file: str):
         Example: https://github.com/jataware/spacetag/blob/schema/example.json
 
     """
+
+    # Read JSON schema to be mapper.
     mapper = json.loads(open(mp).read())
+
+    # Validate JSON mapper schema against SpaceTag schema.py model.
+    model = SpaceModel(geo=mapper['geo'], date=mapper['date'], feature=mapper['feature'], meta=mapper['meta'])
+
+    # "meta" portion of schema specifies transformation type
     transform = mapper["meta"]
 
     # Make mapper contain only keys for date, geo, and feature.
@@ -778,9 +788,9 @@ def process(fp: str, mp: str, admin: str, output_file: str):
 
 # Testing
 """
-mp = 'examples/causemosify-tests/to_validate.json'
-fp = 'examples/causemosify-tests/raw_data.csv'
+mp = 'examples/causemosify-tests/test_file_5_schema2.json'
+fp = 'examples/causemosify-tests/test_file_5_schema2.csv'
 geo = 'admin3'
-outf = 'examples/causemosify-tests/spacetag_test'
+outf = 'examples/causemosify-tests/test_file_5_schema2'
 process(fp, mp, geo, outf) 
 """
