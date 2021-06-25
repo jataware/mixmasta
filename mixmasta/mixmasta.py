@@ -449,10 +449,25 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         "value",
     ]
 
+    required_cols = [
+        "timestamp",
+        "country",
+        "admin1",
+        "admin2",
+        "admin3",
+        "lat",
+        "lng",
+    ]
+
     # mapper is a dictionary of lists of dictionaries.
     primary_time_cols = [k['name'] for k in mapper['date'] if 'primary_date' in k and k['primary_date'] == True]
     other_time_cols   = [k['name'] for k in mapper['date'] if 'primary_date' not in k or k['primary_date'] == False]   
     primary_geo_cols  = [k["name"] for k in mapper["geo"]  if "primary_geo"  in k and k["primary_geo"] == True]
+
+    # dictionary for columns qualified by another column.
+    # key: qualified column
+    # value: list of columns that qualifies key column
+    qualified_col_dict = {}
 
     # subset dataframe for only columns specified in mapper schema.
     mapper_keys = []
@@ -482,6 +497,22 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 df.rename(columns={kk: staple_col_name}, inplace=True)
             elif date_dict["date_type"] in ["day","month","year"]:
                 primary_date_group_mapper.append(date_dict)
+        elif "qualifies" in date_dict and date_dict["qualifies"]:
+            # Note that any “qualifier” column that is not primary geo/date 
+            # will just be lopped on to the right as its own column. It’s 
+            # column name will just be the name and Uncharted will deal with 
+            # it. The key takeaway is that qualifier columns grow the width, 
+            # not the length of the dataset.
+            # Want to add the qualified col as the dictionary key.
+            # e.g. "name": "region", "qualifies": ["probability", "color"]
+            # should produce two dict entries for prob and color, with region 
+            # in a list as the value for both.
+            for k in date_dict["qualifies"]:
+                if k in qualified_col_dict:
+                    qualified_col_dict[k].append(kk)
+                else:
+                    qualified_col_dict[k] = [kk]
+
         else:            
             if kk in other_time_cols and date_dict["date_type"] == "date":
                 # Convert all date/time to epoch time if not already.
@@ -497,7 +528,6 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 # (instead of storing them as separate uncombined features). 
                 other_date_group_mapper[kk] = date_dict
                 continue
-
             # All not primary_time, not associated_columns fields are pushed to features.
             features.append(kk)  
 
@@ -525,7 +555,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         if not "timestamp" in df.columns:
             new_column_name = "timestamp"
         else:
-            new_column_name = ''.join(assoc_fields)
+            new_column_name = ''.join(sorted(assoc_fields))
 
         df = df.join(df.apply(generate_timestamp, date_mapper=assoc_columns, column_name=new_column_name, axis=1))
         df[new_column_name] = df[new_column_name].apply(lambda x: format_time(str(x), "%m/%d/%y", validate=False))
@@ -555,6 +585,25 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 df["lng"] = longs
                 df["lat"] = lats
                 del df[kk]
+            elif geo_dict["geo_type"] == "country" and kk != "country":
+                # force the country column to be named country
+                staple_col_name = "country"
+                df.rename(columns={kk: staple_col_name}, inplace=True)                
+        elif "qualifies" in geo_dict and geo_dict["qualifies"]:
+            # Note that any "qualifier" column that is not primary geo/date 
+            # will just be lopped on to the right as its own column. It'’'s 
+            # column name will just be the name and Uncharted will deal with 
+            # it. The key takeaway is that qualifier columns grow the width, 
+            # not the length of the dataset.
+            # Want to add the qualified col as the dictionary key.
+            # e.g. "name": "region", "qualifies": ["probability", "color"]
+            # should produce two dict entries for prob and color, with region 
+            # in a list as the value for both.
+            for k in geo_dict["qualifies"]:
+                if k in qualified_col_dict:
+                    qualified_col_dict[k].append(kk)
+                else:
+                    qualified_col_dict[k] = [kk]          
         else:
             # only push geo columns to the named columns
             # in the event there is no primary geo
@@ -574,40 +623,73 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                     continue
             features.append(kk)
 
-    # Append columns annotated in feature dict to features list.
-    features.extend([k["name"] for k in mapper["feature"] ])
+    # Append columns annotated in feature dict to features list (if not a 
+    # qualifies column)
+    #features.extend([k["name"] for k in mapper["feature"]])
+    for feature_dict in mapper["feature"]:
+        if "qualifies" not in feature_dict or not feature_dict["qualifies"]:
+            features.append(feature_dict["name"])
+        elif "qualifies" in feature_dict and feature_dict["qualifies"]: 
+            # Note that any "qualifier" column that is not primary geo/date 
+            # will just be lopped on to the right as its own column. It's 
+            # column name will just be the name and Uncharted will deal with 
+            # it. The key takeaway is that qualifier columns grow the width, 
+            # not the length of the dataset.
+            # Want to add the qualified col as the dictionary key.
+            # e.g. "name": "region", "qualifies": ["probability", "color"]
+            # should produce two dict entries for prob and color, with region 
+            # in a list as the value for both.
+            for k in feature_dict["qualifies"]:
+                kk = feature_dict["name"]
+                if k in qualified_col_dict:
+                    qualified_col_dict[k].append(kk)
+                else:
+                    qualified_col_dict[k] = [kk]       
 
     # perform geocoding if lat/lng are present
     if "lat" in df and "lng" in df:
         df = geocode(admin, df, x="lng", y="lat")
     elif len(primary_geo_cols) == 0 and "country" in df:
         # Correct any misspellings etc. in state and admin areas only when
-        # 
         df = match_geo_names(admin, df)
 
     df_geo_cols = [i for i in df.columns if 'mixmasta_geocoded' in i]
     for c in df_geo_cols:
         df.rename(columns={c: c.replace('_mixmasta_geocoded','')}, inplace=True)
     
-    required_cols = [
-        "timestamp",
-        "country",
-        "admin1",
-        "admin2",
-        "admin3",
-        "lat",
-        "lng",
-    ]
-    
+
+    # protected_cols are the required_cols present in the submitted dataframe.
     protected_cols = list(set(required_cols) & set(df.columns))
+
+    # if a field qualifies a protected field like country, it should have data
+    # in each row, unlike features below where the qualifying data appears
+    # only on those rows.
+    # k: qualified column (str)
+    # v: list of columns (str) that qualify k
+    for k,v in qualified_col_dict.items():
+        if k in protected_cols:
+            # k is qualified by the columns in v, and k is a protected column,
+            # so extend the width of the output dataset with v for each row.
+            protected_cols.extend(v)
+            col_order.extend(v)
+
+
     df_out = pd.DataFrame()
     for feat in features:
+        using_cols = protected_cols.copy()
+
+        if feat in qualified_col_dict:
+            # dict value is a list, so extend.
+            using_cols.extend(qualified_col_dict[feat])
+            col_order.extend(qualified_col_dict[feat])
+        
         join_overlap = False
         try:
-            df_ = df[protected_cols + [feat+'_mixmasta_left']].copy()
+            df_ = df[using_cols + [feat+'_mixmasta_left']].copy()
             join_overlap = True
         except:            
-            df_ = df[protected_cols + [feat]].copy()            
+            df_ = df[using_cols + [feat]].copy()            
+
         try:
             if mapper[feat]["new_col_name"] == None:
                 df_["feature"] = feat
@@ -615,11 +697,13 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 df_["feature"] = mapper[feat]["new_col_name"]
         except:
             df_["feature"] = feat
+
         if join_overlap:
             df_.rename(columns={f"{feat}_mixmasta_left": "value"}, inplace=True)
         else:
             df_.rename(columns={feat: "value"}, inplace=True)
 
+        
         # Add feature/value for epochtime as object adds it without decimal
         # places, but it is still saved as a double in the parquet file.
         if len(df_out) == 0:
@@ -683,7 +767,8 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     del(norm_str['type'])
     del(norm['type'])    
 
-    #print('\n', norm.head())
+    #print('\n', norm.head(20))
+    #print('\n', norm.tail(20))
     #print('\n', norm_str.tail())
 
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
@@ -692,8 +777,10 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     return norm.append(norm_str)
 
 # Testing
-#mp = 'examples/causemosify-tests/test_file_5_schema2.json'
-#fp = 'examples/causemosify-tests/test_file_5_schema2.csv'
-#geo = 'admin3'
-#outf = 'examples/causemosify-tests/test_file_5_schema2'
-#process(fp, mp, geo, outf) 
+"""
+mp = 'examples/causemosify-tests/to_validate.json'
+fp = 'examples/causemosify-tests/raw_data.csv'
+geo = 'admin3'
+outf = 'examples/causemosify-tests/spacetag_test'
+process(fp, mp, geo, outf) 
+"""
