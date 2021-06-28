@@ -223,7 +223,7 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
 
         # Get list of admin1 values in df but not in gadm. Reduce list for country.           
         admin1_list = gadm[gadm.country==c]["admin1"].unique()    
-        if admin1_list is not None and all(admin1_list):
+        if admin1_list is not None and all(admin1_list) and 'admin1' in df:
             unknowns = df[(df.country == c) & ~df.admin1.isin(admin1_list)].admin1.tolist()
             unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
             for unk in unknowns:
@@ -233,7 +233,7 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
 
         # Get list of admin2 values in df but not in gadm. Reduce list for country.           
         admin2_list = gadm[gadm.country==c ]["admin2"].unique()
-        if admin2_list is not None and all(admin2_list):
+        if admin2_list is not None and all(admin2_list) and 'admin2' in df:
             unknowns = df[(df.country == c) & ~df.admin2.isin(admin2_list)].admin2.tolist()
             unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
             for unk in unknowns:
@@ -244,7 +244,7 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
         if admin =='admin3':
             # Get list of admin3 values in df but not in gadm. Reduce list for country.           
             admin3_list = gadm[gadm.country==c]["admin3"].unique()       
-            if admin3_list is not None and all(admin3_list):
+            if admin3_list is not None and all(admin3_list) and 'admin3' in df:
                 unknowns = df[(df.country == c) & ~df.admin3.isin(admin3_list)].admin3.tolist()
                 unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
                 for unk in unknowns:                
@@ -481,7 +481,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     # Rename protected columns
     # and perform type conversion on the time column
     features = []
-    primary_date_group_mapper = []
+    primary_date_group_mapper = {}
     other_date_group_mapper = {}
     for date_dict in mapper["date"]:
         kk = date_dict["name"]
@@ -499,10 +499,10 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 staple_col_name = "timestamp"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
             elif date_dict["date_type"] in ["day","month","year"]:
-                primary_date_group_mapper.append(date_dict)
+                primary_date_group_mapper[kk] = date_dict
         elif "qualifies" in date_dict and date_dict["qualifies"]:
-            # Note that any “qualifier” column that is not primary geo/date 
-            # will just be lopped on to the right as its own column. It’s 
+            # Note that any "qualifier" column that is not primary geo/date 
+            # will just be lopped on to the right as its own column. It's 
             # column name will just be the name and Uncharted will deal with 
             # it. The key takeaway is that qualifier columns grow the width, 
             # not the length of the dataset.
@@ -742,7 +742,7 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     mapper = json.loads(open(mp).read())
 
     # Validate JSON mapper schema against SpaceTag schema.py model.
-    model = SpaceModel(geo=mapper['geo'], date=mapper['date'], feature=mapper['feature'], meta=mapper['meta'])
+    #model = SpaceModel(geo=mapper['geo'], date=mapper['date'], feature=mapper['feature'], meta=mapper['meta'])
 
     # "meta" portion of schema specifies transformation type
     transform = mapper["meta"]
@@ -777,9 +777,10 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     del(norm_str['type'])
     del(norm['type'])    
 
-    #print('\n', norm.head(20))
-    #print('\n', norm.tail(20))
-    #print('\n', norm_str.tail())
+    # Testing
+    """print('\n', norm.head(50))
+    print('\n', norm.tail(50))
+    print('\n', norm_str.head(50))"""
 
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
@@ -788,9 +789,9 @@ def process(fp: str, mp: str, admin: str, output_file: str):
 
 # Testing
 """
-mp = 'examples/causemosify-tests/test_file_5_schema2.json'
-fp = 'examples/causemosify-tests/test_file_5_schema2.csv'
+mp = 'examples/causemosify-tests/test_file_2_schema2.json'
+fp = 'examples/causemosify-tests/test_file_2_schema2.csv'
 geo = 'admin3'
-outf = 'examples/causemosify-tests/test_file_5_schema2'
+outf = 'examples/causemosify-tests/test_file_2_schema2'
 process(fp, mp, geo, outf) 
 """
