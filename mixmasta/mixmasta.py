@@ -742,7 +742,7 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     mapper = json.loads(open(mp).read())
 
     # Validate JSON mapper schema against SpaceTag schema.py model.
-    #model = SpaceModel(geo=mapper['geo'], date=mapper['date'], feature=mapper['feature'], meta=mapper['meta'])
+    model = SpaceModel(geo=mapper['geo'], date=mapper['date'], feature=mapper['feature'], meta=mapper['meta'])
 
     # "meta" portion of schema specifies transformation type
     transform = mapper["meta"]
@@ -789,9 +789,9 @@ def process(fp: str, mp: str, admin: str, output_file: str):
 
 # Testing
 """
-mp = 'examples/causemosify-tests/test_file_2_schema2.json'
-fp = 'examples/causemosify-tests/test_file_2_schema2.csv'
+mp = 'examples/causemosify-tests/test_file_5_schema2.json'
+fp = 'examples/causemosify-tests/test_file_5_schema2.csv'
 geo = 'admin3'
-outf = 'examples/causemosify-tests/test_file_2_schema2'
+outf = 'examples/causemosify-tests/test_file_5_schema2'
 process(fp, mp, geo, outf) 
 """

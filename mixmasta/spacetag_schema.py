@@ -79,7 +79,6 @@ class GeoAnnotation(BaseModel):
         example=["crop_production", "malnutrition_rate"],
     )
 
-
 class TimeField(str, Enum):
     YEAR = "year"
     MONTH = "month"
@@ -99,8 +98,10 @@ class DateAnnotation(BaseModel):
         example="%y",
     )
     date_type: DateType
-    #Following line throws Exception "TypeError: 'type' object is not subscriptable"
-    #associated_columns: Optional[dict[TimeField, str]] = Field(
+    # The following line 
+    # associated_columns: Optional[dict[TimeField, str]] = Field(
+    # throws Exception "TypeError: 'type' object is not subscriptable"
+    # Solve by not subscripting the dicionary; instead, add a validator. 
     associated_columns: Optional[dict] = Field(
         title="Associated datetime column",
         description="the type of time as the key with the column name being the value",
@@ -115,10 +116,19 @@ class DateAnnotation(BaseModel):
     @validator('date_type')
     def time_format_optional(cls, v, values):
         if v == DateType.DATE and values["time_format"] == None:
-                raise ValueError('time_format is required for when date_type is date')
+            raise ValueError('time_format is required for when date_type is date')
         return v
 
-
+    @validator('associated_columns')
+    def validate_associated_columns(cls, v):
+        # v is type dict
+        # validate it is dict[TimeField, str]
+        timefield_list = [e.value for e in TimeField]
+        for kk, vv in v.items():
+            if kk not in timefield_list:
+                raise ValueError(str.format('Date associated_columns dictionary key must be of type TimeField: {} in {}', kk, v))
+            elif type(vv) is not str:
+                raise ValueError(str.format('Date associated_columns dictionary value must be of type string: {} in {}', vv, v))
 
 class FeatureAnnotation(BaseModel):
     name: str
