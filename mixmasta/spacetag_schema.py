@@ -98,11 +98,11 @@ class DateAnnotation(BaseModel):
         example="%y",
     )
     date_type: DateType
-    # The following line 
+    # The following line
     # associated_columns: Optional[dict[TimeField, str]] = Field(
     # throws Exception "TypeError: 'type' object is not subscriptable"
-    # Solve by not subscripting the dicionary; instead, add a validator. 
-    associated_columns: Optional[dict] = Field(
+    # Solve by not subscripting the dicionary; instead, add a validator.
+    associated_columns: Optional[{TimeField: str}] = Field(
         title="Associated datetime column",
         description="the type of time as the key with the column name being the value",
         example={"day": "day_column", "hour": "hour_column"},
