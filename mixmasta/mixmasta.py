@@ -16,13 +16,11 @@ from osgeo import gdal, gdalconst
 from shapely import speedups
 from shapely.geometry import Point
 
-
 import fuzzywuzzy
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 import timeit
-from .spacetag_schema import SpaceModel
-
+#from .spacetag_schema import SpaceModel
 
 if not sys.warnoptions:
     import warnings
@@ -31,131 +29,259 @@ if not sys.warnoptions:
 
 logger = logging.getLogger(__name__)
 
+def audit_renamed_col_dict(dct: dict) -> dict:
+    # Handle edge cases where a col could be renamed back to itself.
+    # example: no primary_geo, but country is present. Becase it is a protected
+    # col name, it would be renamed country_non_primary. Later, it would be set
+    # as primary_geo country, and the pair added to renamed_col_dict again:
+    # {"['country']": 'country_non_primary', "['country_non_primary']": 'country' }
 
-def netcdf2df(netcdf: str) -> pd.DataFrame:
+    remove_these = []
+    for v in dct.values():
+        l = [v]
+        if str([v]) in dct.keys():
+            remove_these.append(str([v]))
+            print(str([v]), ' scheduled for termination' )
+
+    return dct
+
+def format_time(t: str, time_format: str, validate: bool = True) -> int:
     """
-    Produce a dataframe from a NetCDF4 file.
+    Description
+    -----------
+    Converts a time feature (t) into epoch time using `time_format` which is a strftime definition
 
     Parameters
     ----------
-    netcdf: str
-        Path to the netcdf file
+    t: str
+        the time string
+    time_format: str
+        the strftime format for the string t
+    validate: bool, default True
+        whether to error check the time string t. Is set to False, then no error is raised if the date fails to parse, but None is returned.
 
-    Returns
-    -------
-    DataFrame
-        The resultant dataframe
+    Examples
+    --------
+
+    >>> epoch = format_time('5/12/20 12:20', '%m/%d/%y %H:%M')
     """
+
     try:
-        ds = xr.open_dataset(netcdf)
-    except:
-        raise AssertionError(f"improperly formatted netCDF file ({netcdf})")
+        t_ = int(datetime.strptime(t, time_format).timestamp())
 
-    data = ds.to_dataframe()
-    df = data.reset_index()
+        return t_
+    except Exception as e:
+        print(e)
+        if validate:
+            raise Exception(e)
+        else:
+            return None
 
-    return df
-
-
-def raster2df(
-    InRaster: str,
-    feature_name: str = "feature",
-    band: int = 1,
-    nodataval: int = -9999,
-    date: str = None,
+def geocode(
+    admin: str, df: pd.DataFrame, x: str = "longitude", y: str = "latitude"
 ) -> pd.DataFrame:
     """
     Description
     -----------
-    Takes the path of a raster (.tiff) file and produces a Geopandas Data Frame.
+    Takes a dataframe containing coordinate data and geocodes it to GADM (https://gadm.org/)
+
+    GEOCODES to ADMIN 2 OR 3 LEVEL
 
     Parameters
     ----------
-    InRaster: str
-        the path of the input raster file
-    feature_name: str
-        the name of the feature represented by the pixel values
-    band: int, default 1
-        the band to operate on
-    nodataval: int, default -9999
-        the value for no data pixels
-    date: str, default None
-        date associated with the raster (if any)
+    admin: str
+        the level to geocode to. Either 'admin2' or 'admin3'
+    df: pd.DataFrame
+        a pandas dataframe containing point data
+    x: str, default 'longitude'
+        the name of the column containing longitude information
+    y: str, default 'latitude'
+        the name of the column containing latitude data
 
     Examples
     --------
-    Converting a geotiff of rainfall data into a geopandas dataframe
+    Geocoding a dataframe with columns named 'lat' and 'lon'
 
-    >>> df = raster2df('path_to_raster.geotiff', 'rainfall', band=1)
+    >>> df = geocode(df, x='lon', y='lat')
 
     """
 
-    # open the raster and get some properties
-    ds = gdal.OpenShared(InRaster, gdalconst.GA_ReadOnly)
-    GeoTrans = ds.GetGeoTransform()
-    ColRange = range(ds.RasterXSize)
-    RowRange = range(ds.RasterYSize)
-    rBand = ds.GetRasterBand(band)  # first band
-    nData = rBand.GetNoDataValue()
-    if nData == None:
-        logging.info(f"No nodataval found, setting to {nodataval}")
-        nData = np.float32(nodataval)  # set it to something if not set
-    else:
-        logging.info(f"Nodataval is: {nData}")
+    flag = speedups.available
+    if flag == True:
+        speedups.enable()
 
-    # specify the center offset (takes the point in middle of pixel)
-    HalfX = GeoTrans[1] / 2
-    HalfY = GeoTrans[5] / 2
+    cdir = os.path.expanduser("~")
+    download_data_folder = f"{cdir}/mixmasta_data"
 
-    # Check that NoDataValue is of the same type as the raster data
-    RowData = rBand.ReadAsArray(0, 0, ds.RasterXSize, 1)[0]
-    if type(nData) != type(RowData[0]):
-        logging.warning(
-            f"NoData type mismatch: NoDataValue is type {type(nData)} and raster data is type {type(RowData[0])}"
-        )
+    if admin == "admin2":
 
-    points = []
-    for ThisRow in RowRange:
-        RowData = rBand.ReadAsArray(0, ThisRow, ds.RasterXSize, 1)[0]
-        for ThisCol in ColRange:
-            # need to exclude NaN values since there is no nodataval
-            if (RowData[ThisCol] != nData) and not (np.isnan(RowData[ThisCol])):
+        gadm_fn = f"gadm36_2.feather"
+        gadmDir = f"{download_data_folder}/{gadm_fn}"
+        gadm = gf.from_geofeather(gadmDir)
 
-                # TODO: implement filters on valid pixels
-                # for example, the below would ensure pixel values are between -100 and 100
-                # if (RowData[ThisCol] <= 100) and (RowData[ThisCol] >= -100):
+        gadm["country"] = gadm["NAME_0"]
+        gadm["state"] = gadm["NAME_1"]
+        gadm["admin1"] = gadm["NAME_1"]
+        gadm["admin2"] = gadm["NAME_2"]
+        gadm = gadm[["geometry", "country", "state", "admin1", "admin2"]]
+    elif admin == "admin3":
 
-                X = GeoTrans[0] + (ThisCol * GeoTrans[1])
-                Y = GeoTrans[3] + (
-                    ThisRow * GeoTrans[5]
-                )  # Y is negative so it's a minus
-                # this gives the upper left of the cell, offset by half a cell to get centre
-                X += HalfX
-                Y += HalfY
+        gadm_fn = f"gadm36_3.feather"
+        gadmDir = f"{download_data_folder}/{gadm_fn}"
+        gadm = gf.from_geofeather(gadmDir)
 
-                points.append([X, Y, RowData[ThisCol]])
-
-    df = pd.DataFrame(points, columns=["longitude", "latitude", feature_name])
-    if date:
-        df["date"] = date
-    return df
+        gadm["country"] = gadm["NAME_0"]
+        gadm["state"] = gadm["NAME_1"]
+        gadm["admin1"] = gadm["NAME_1"]
+        gadm["admin2"] = gadm["NAME_2"]
+        gadm["admin3"] = gadm["NAME_3"]
+        gadm = gadm[["geometry", "country", "state", "admin1", "admin2", "admin3"]]
 
 
-def ping_isi(country_list: list):
-    with open('report.xls', 'rb') as f:
-        r = requests.post('http://httpbin.org/post', files={'report.xls': f})
+    df["geometry"] = df.apply(lambda row: Point(row[x], row[y]), axis=1)
+    gdf = gpd.GeoDataFrame(df)
 
-    # Not found in pycountry. Use isi.
-    """try:
-        endpoint = "https://dsbox02.isi.edu:8888/wikifier/wikify?columns=Country"
-        response = requests.get(endpoint)
-         resp = response.json()
+    # Spatial merge on GADM to obtain admin areas
+    gdf = gpd.sjoin(gdf, gadm, how="left", op="within", lsuffix="mixmasta_left", rsuffix="mixmasta_geocoded")
+    del gdf["geometry"]
+    del gdf["index_mixmasta_geocoded"]
 
+    return pd.DataFrame(gdf)
 
-    except Exception as e:
-        print(e)
+def generate_column_name(field_list: list) -> str:
+    """
+    Description
+    -----------
+    Contatenate a list of column fields into a single column name.
+
+    Parameters
+    ----------
+    field_list: list[str] of column names
+
+    Returns
+    -------
+    str new column name
+
+    """
+    return ''.join(sorted(field_list))
+
+def generate_timestamp(series: pd.Series, date_mapper: dict, column_name: str) -> pd.Series:
+    """
+    Description
+    -----------
+    Generates a pandas series in M/D/Y H:M format from collected Month, Day,
+    Year, Hour, Minute values in a parameter pandas series. Fills Month, Day,
+    Year, Hour, Minute if missing, but at least one should be present to
+    generate the value. Used to generate a timestamp in the absence of one in
+    the data.
+
+    Parameters
+    ----------
+    row: pd.Series
+        a pandas series containing date data
+    date_mapper: dict
+        a schema mapping (JSON) for the dataframe filtered for "date_type" equal to
+        Day, Month, or Year.
+    column_name: str
+        name of the new column e.g. timestamp for primary_time, year1month1day1
+        for a concatneated name from associated date fields.
+
+    Examples
+    --------
+    This example adds the generated series to the source dataframe.
+    >>> df = df.join(df.apply(generate_timestamp, date_mapper=date_mapper,
+            column_name="year1month1day", axis=1))
     """
 
+    # Default to 1/1/1970
+    day = 1
+    month = 1
+    year = 70
+
+    for kk, vv in date_mapper.items():
+        if vv["date_type"] == "day":
+            day = series[kk]
+        elif vv["date_type"] == "month":
+            month = series[kk]
+        elif vv["date_type"] == "year":
+            year = str(series[kk])
+
+    timestamp =  '/'.join([str(month),str(day),str(year)])
+    return pd.Series(timestamp, index=[column_name])
+
+def generate_timestamp_format(date_mapper: dict) -> str:
+    """
+    Description
+    -----------
+    Generates a the time format for day,month,year dates based on each's
+    specified time_format.
+
+    Parameters
+    ----------
+    date_mapper: dict
+        a dictionary for the schema mapping (JSON) for the dataframe filtered
+        for "date_type" equal to Day, Month, or Year.
+
+    Output
+    ------
+    e.g. "%m/%d/%Y"
+    """
+
+    day = "%d"
+    month = "%m"
+    year = "%y"
+
+    for kk, vv in date_mapper.items():
+        if vv["date_type"] == "day":
+            day = vv["time_format"]
+        elif vv["date_type"] == "month":
+            month = vv["time_format"]
+        elif vv["date_type"] == "year":
+            year = vv["time_format"]
+
+    return str.format("{}/{}/{}", month, day, year)
+
+def handle_colname_collisions(df: pd.DataFrame, mapper: dict, protected_cols: list) -> (pd.DataFrame, dict, dict):
+    # Get names of geo fields that collide and are not primary_geo = True
+    non_primary_geo_cols = [d["name"] for d in mapper["geo"] if d["name"] in protected_cols and ("primary_geo" not in d or d["primary_geo"] == False)]
+
+    # Get names of date fields that collide and are not primary_date = True
+    non_primary_time_cols = [d['name'] for d in mapper['date'] if d["name"] in protected_cols and ('primary_date' not in d or d['primary_date'] == False)]
+
+    # Only need to change a feature column name if it qualifies another field,
+    # and therefore will be appended as a column to the output.
+    feature_cols = [d["name"] for d in mapper['feature'] if d["name"] in protected_cols and "qualifies" in d and d["qualifies"]]
+
+    # Verbose build of the collision_list, could have combined above.
+    collision_list = non_primary_geo_cols + non_primary_time_cols + feature_cols
+
+    # Bail if no column name collisions.
+    if not collision_list:
+        return df, mapper, {}
+
+    # Append any collision columns with the following suffix.
+    suffix = "_non_primary"
+
+    # Build output dictionary
+    output_dict = { str([col]) : col + suffix  for col in collision_list }
+
+    # Update df
+    for col in collision_list:
+        df.rename(columns={col: col + suffix}, inplace=True)
+
+    # Update mapper
+    for k, vlist in mapper.items():
+        for dct in vlist:
+            if dct["name"] in collision_list:
+                dct["name"] = dct["name"] + suffix
+            elif "qualifies" in dct and dct["qualifies"]:
+                # change any instances of this column name qualified by another field
+                dct["qualifies"] = [w.replace(w, w + suffix) for w in dct["qualifies"] if w in collision_list]
+            elif "associated_columns" in dct and dct["associated_columns"]:
+                # change any instances of this column name in an associated_columns dict
+                dct["associated_columns"] = {k: v.replace(v, v + suffix) if v in collision_list else v for k, v in dct["associated_columns"].items() }
+
+    return df, mapper, output_dict
 
 def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -256,154 +382,29 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-def geocode(
-    admin: str, df: pd.DataFrame, x: str = "longitude", y: str = "latitude"
-) -> pd.DataFrame:
+def netcdf2df(netcdf: str) -> pd.DataFrame:
     """
-    Description
-    -----------
-    Takes a dataframe containing coordinate data and geocodes it to GADM (https://gadm.org/)
-
-    GEOCODES to ADMIN 2 OR 3 LEVEL
+    Produce a dataframe from a NetCDF4 file.
 
     Parameters
     ----------
-    admin: str
-        the level to geocode to. Either 'admin2' or 'admin3'
-    df: pd.DataFrame
-        a pandas dataframe containing point data
-    x: str, default 'longitude'
-        the name of the column containing longitude information
-    y: str, default 'latitude'
-        the name of the column containing latitude data
+    netcdf: str
+        Path to the netcdf file
 
-    Examples
-    --------
-    Geocoding a dataframe with columns named 'lat' and 'lon'
-
-    >>> df = geocode(df, x='lon', y='lat')
-
+    Returns
+    -------
+    DataFrame
+        The resultant dataframe
     """
-
-    flag = speedups.available
-    if flag == True:
-        speedups.enable()
-
-    cdir = os.path.expanduser("~")
-    download_data_folder = f"{cdir}/mixmasta_data"
-
-    if admin == "admin2":
-
-        gadm_fn = f"gadm36_2.feather"
-        gadmDir = f"{download_data_folder}/{gadm_fn}"
-        gadm = gf.from_geofeather(gadmDir)
-
-        gadm["country"] = gadm["NAME_0"]
-        gadm["state"] = gadm["NAME_1"]
-        gadm["admin1"] = gadm["NAME_1"]
-        gadm["admin2"] = gadm["NAME_2"]
-        gadm = gadm[["geometry", "country", "state", "admin1", "admin2"]]
-    elif admin == "admin3":
-
-        gadm_fn = f"gadm36_3.feather"
-        gadmDir = f"{download_data_folder}/{gadm_fn}"
-        gadm = gf.from_geofeather(gadmDir)
-
-        gadm["country"] = gadm["NAME_0"]
-        gadm["state"] = gadm["NAME_1"]
-        gadm["admin1"] = gadm["NAME_1"]
-        gadm["admin2"] = gadm["NAME_2"]
-        gadm["admin3"] = gadm["NAME_3"]
-        gadm = gadm[["geometry", "country", "state", "admin1", "admin2", "admin3"]]
-
-
-    df["geometry"] = df.apply(lambda row: Point(row[x], row[y]), axis=1)
-    gdf = gpd.GeoDataFrame(df)
-
-    # Spatial merge on GADM to obtain admin areas
-    gdf = gpd.sjoin(gdf, gadm, how="left", op="within", lsuffix="mixmasta_left", rsuffix="mixmasta_geocoded")
-    del gdf["geometry"]
-    del gdf["index_mixmasta_geocoded"]
-
-    return pd.DataFrame(gdf)
-
-
-def generate_timestamp(series, date_mapper, column_name):
-    """
-    Description
-    -----------
-    Generates a pandas series in M/D/Y H:M format from collected Month, Day,
-    Year, Hour, Minute values in a parameter pandas series. Fills Month, Day,
-    Year, Hour, Minute if missing, but at least one should be present to
-    generate the value. Used to generate a timestamp in the absence of one in
-    the data.
-
-    Parameters
-    ----------
-    row: pd.Series
-        a pandas series containing date data
-    date_mapper: dict
-        a schema mapping (JSON) for the dataframe filtered for "date_type" equal to
-        Day, Month, or Year.
-    column_name: str
-        name of the new column e.g. timestamp for primary_time, year1month1day1
-        for a concatneated name from associated date fields.
-
-    Examples
-    --------
-    This example adds the generated series to the source dataframe.
-    >>> df = df.join(df.apply(generate_timestamp, date_mapper=date_mapper,
-            column_name="year1month1day", axis=1))
-    """
-
-    # Default to 1/1/1970 00:01
-    day = 1
-    month = 1
-    year = 70
-
-    for kk, vv in date_mapper.items():
-        if vv["date_type"] == "day":
-            day = series[kk]
-        elif vv["date_type"] == "month":
-            month = series[kk]
-        elif vv["date_type"] == "year":
-            year = str(series[kk])[-2:]
-
-    return pd.Series(['{}/{}/{}'.format(month,day,year)], index=[column_name])
-
-
-def format_time(t: str, time_format: str, validate: bool = True) -> int:
-    """
-    Description
-    -----------
-    Converts a time feature (t) into epoch time using `time_format` which is a strftime definition
-
-    Parameters
-    ----------
-    t: str
-        the time string
-    time_format: str
-        the strftime format for the string t
-    validate: bool, default True
-        whether to error check the time string t. Is set to False, then no error is raised if the date fails to parse, but None is returned.
-
-    Examples
-    --------
-
-    >>> epoch = format_time('5/12/20 12:20', '%m/%d/%y %H:%M')
-    """
-
     try:
-        t_ = int(datetime.strptime(t, time_format).timestamp())
+        ds = xr.open_dataset(netcdf)
+    except:
+        raise AssertionError(f"improperly formatted netCDF file ({netcdf})")
 
-        return t_
-    except Exception as e:
-        print(e)
-        if validate:
-            raise Exception(e)
-        else:
-            return None
+    data = ds.to_dataframe()
+    df = data.reset_index()
 
+    return df
 
 def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     """
@@ -461,6 +462,11 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         "lng",
     ]
 
+
+    # Create a dictionary of list: colnames: new col name, and modify df and
+    # mapper for any column name collisions.
+    df, mapper, renamed_col_dict = handle_colname_collisions(df, mapper, col_order)
+
     # mapper is a dictionary of lists of dictionaries.
     primary_time_cols = [k['name'] for k in mapper['date'] if 'primary_date' in k and k['primary_date'] == True]
     other_time_cols   = [k['name'] for k in mapper['date'] if 'primary_date' not in k or k['primary_date'] == False]
@@ -494,13 +500,35 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 df[kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
                 staple_col_name = "timestamp"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
+                renamed_col_dict[ str([kk]) ] = staple_col_name
             elif date_dict["date_type"] == "epoch":
                 # rename epoch time column as 'timestamp'
                 staple_col_name = "timestamp"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
+                renamed_col_dict[ str([kk]) ] = staple_col_name
             elif date_dict["date_type"] in ["day","month","year"]:
                 primary_date_group_mapper[kk] = date_dict
-        elif "qualifies" in date_dict and date_dict["qualifies"]:
+
+        else:
+            if kk in other_time_cols and date_dict["date_type"] == "date":
+                # Convert all date/time to epoch time if not already.
+                df[kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
+                # If three are no assigned primary_time columns, make this the
+                # primary_time timestamp column, and keep as a feature so the
+                # column_name meaning is not lost.
+                if not primary_time_cols and not "timestamp" in df.columns:
+                    df.rename(columns={kk: "timestamp"}, inplace=True)
+                    renamed_col_dict[ str([kk]) ] = staple_col_name
+                # All not primary_time, not associated_columns fields are pushed to features.
+                features.append(kk)
+
+            elif date_dict["date_type"] in ["day","month","year"] and 'associated_columns' in date_dict and date_dict["associated_columns"]:
+                # Various date columns have been associated by the user and are not primary_date.
+                # convert them to epoch then store them as a feature
+                # (instead of storing them as separate uncombined features).
+                other_date_group_mapper[kk] = date_dict
+
+        if "qualifies" in date_dict and date_dict["qualifies"]:
             # Note that any "qualifier" column that is not primary geo/date
             # will just be lopped on to the right as its own column. It's
             # column name will just be the name and Uncharted will deal with
@@ -516,29 +544,28 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 else:
                     qualified_col_dict[k] = [kk]
 
-        else:
-            if kk in other_time_cols and date_dict["date_type"] == "date":
-                # Convert all date/time to epoch time if not already.
-                df[kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
-                # If three are no assigned primary_time columns, make this the
-                # primary_time timestamp column, and keep as a feature so the
-                # column_name meaning is not lost.
-                if not primary_time_cols and not "timestamp" in df.columns:
-                    df.rename(columns={kk: "timestamp"}, inplace=True)
-            elif date_dict["date_type"] in ["day","month","year"] and 'associated_columns' in date_dict:
-                # Various date columns have been associated by the user and are not primary_date.
-                # convert them to epoch then store them as a feature
-                # (instead of storing them as separate uncombined features).
-                other_date_group_mapper[kk] = date_dict
-                continue
-            # All not primary_time, not associated_columns fields are pushed to features.
-            features.append(kk)
-
     if primary_date_group_mapper:
-        # Applied when there were primary_date year,month,day fields above. These need to be combined
+        # Applied when there were primary_date year,month,day fields above.
+        # These need to be combined
         # into a date and then epoch time, and added as the timestamp field.
-        df = df.join(df.apply(generate_timestamp, date_mapper=primary_date_group_mapper, column_name="timestamp", axis=1))
-        df['timestamp'] = df["timestamp"].apply(lambda x: format_time(str(x), "%m/%d/%y", validate=False))
+
+        # Create a separate df of the associated date fields. This avoids
+        # pandas upcasting the series dtypes on df.apply(); e.g., int to float,
+        # or a month 9 to 9.0, which breaks generate_timestamp()
+        assoc_fields = primary_date_group_mapper.keys()
+        date_df = df[ assoc_fields ]
+
+        # Now generate the timestamp from date_df and add timestamp col to df.
+        new_series = date_df.apply(generate_timestamp, date_mapper=primary_date_group_mapper, column_name="timestamp", axis=1)
+        df = df.join(new_series)
+
+        # Determine the correct time format for the new date column, and
+        # convert to epoch time.
+        time_formatter = generate_timestamp_format(primary_date_group_mapper)
+        df['timestamp'] = df["timestamp"].apply(lambda x: format_time(str(x), time_formatter, validate=False))
+
+        # Let SpaceTag know those date columns were renamed to timestamp.
+        renamed_col_dict[ str(assoc_fields) ] = "timestamp"
 
     while other_date_group_mapper:
         # Various date columns have been associated by the user and are not primary_date.
@@ -558,10 +585,24 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         if not "timestamp" in df.columns:
             new_column_name = "timestamp"
         else:
-            new_column_name = ''.join(sorted(assoc_fields))
+            new_column_name = generate_column_name(assoc_fields)
 
-        df = df.join(df.apply(generate_timestamp, date_mapper=assoc_columns, column_name=new_column_name, axis=1))
-        df[new_column_name] = df[new_column_name].apply(lambda x: format_time(str(x), "%m/%d/%y", validate=False))
+        # Create a separate df of the associated date fields. This avoids
+        # pandas upcasting the series dtypes on df.apply(); e.g., int to float,
+        # or a month 9 to 9.0, which breaks generate_timestamp()
+        date_df = df[ assoc_fields ]
+
+        # Now generate the timestamp from date_df and add the new_column to df.
+        new_series = date_df.apply(generate_timestamp, date_mapper=assoc_columns, column_name=new_column_name, axis=1)
+        df = df.join(new_series)
+
+        # Determine the correct time format for the new date column, and
+        # convert to epoch time.
+        time_formatter = generate_timestamp_format(assoc_columns)
+        df[new_column_name] = df[new_column_name].apply(lambda x: format_time(str(x), time_formatter, validate=False))
+
+        # Let SpaceTag know those date columns were renamed to a new column.
+        renamed_col_dict[ str(assoc_fields) ] = new_column_name
 
         # timestamp is a protected column, so don't add to features.
         if new_column_name != "timestamp":
@@ -573,9 +614,11 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             if geo_dict["geo_type"] == "latitude":
                 staple_col_name = "lat"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
+                renamed_col_dict[ str([kk]) ] = staple_col_name
             elif geo_dict["geo_type"] == "longitude":
                 staple_col_name = "lng"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
+                renamed_col_dict[ str([kk]) ] = staple_col_name
             elif geo_dict["geo_type"] == "coordinates":
                 c_f = geo_dict["coord_format"]
                 coords = df[kk].values
@@ -592,6 +635,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 # force the country column to be named country
                 staple_col_name = "country"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
+                renamed_col_dict[ str([kk]) ] = staple_col_name
         elif "qualifies" in geo_dict and geo_dict["qualifies"]:
             # Note that any "qualifier" column that is not primary geo/date
             # will just be lopped on to the right as its own column. It'’'s
@@ -614,15 +658,19 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             if len(primary_geo_cols) == 0:
                 if geo_dict["geo_type"] == "country":
                     df["country"] = df[kk]
+                    renamed_col_dict[ str([kk]) ] = "country"
                     continue
                 if geo_dict["geo_type"] == "state/territory":
                     df["admin1"] = df[kk]
+                    renamed_col_dict[ str([kk]) ] = "admin1"
                     continue
                 if geo_dict["geo_type"] == "county/district":
                     df["admin2"] = df[kk]
+                    renamed_col_dict[ str([kk]) ] = "admin2"
                     continue
                 if geo_dict["geo_type"] == "municipality/town":
                     df["admin3"] = df[kk]
+                    renamed_col_dict[ str([kk]) ] = "admin3"
                     continue
             features.append(kk)
 
@@ -676,7 +724,6 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             protected_cols.extend(v)
             col_order.extend(v)
 
-
     df_out = pd.DataFrame()
     for feat in features:
         using_cols = protected_cols.copy()
@@ -724,8 +771,10 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         if c not in df_out:
             df_out[c] = None
 
-    return df_out[col_order]
+    # Handle any renamed cols being renamed.
+    #renamed_col_dict = audit_renamed_col_dict(renamed_col_dict)
 
+    return df_out[col_order]#, renamed_col_dict
 
 def process(fp: str, mp: str, admin: str, output_file: str):
     """
@@ -742,32 +791,34 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     mapper = json.loads(open(mp).read())
 
     # Validate JSON mapper schema against SpaceTag schema.py model.
-    model = SpaceModel(geo=mapper['geo'], date=mapper['date'], feature=mapper['feature'], meta=mapper['meta'])
+    #model = SpaceModel(geo=mapper['geo'], date=mapper['date'], feature=mapper['feature'], meta=mapper['meta'])
 
     # "meta" portion of schema specifies transformation type
     transform = mapper["meta"]
 
-    # Make mapper contain only keys for date, geo, and feature.
-    mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
-
-    if transform["ftype"] == "Geotiff":
-        if transform["Date"] == "":
+    ftype = transform["ftype"]
+    if ftype == "geotiff":
+        if transform["date"] == "":
             d = None
         else:
-            d = transform["Date"]
+            d = transform["date"]
         df = raster2df(
             fp,
-            transform["Feature_name"],
-            int(transform["Band"]),
-            int(transform["Null_val"]),
+            transform["feature_name"],
+            int(transform["band"]),
+            int(transform["null_val"]),
             d,
         )
-
-    elif transform["ftype"] != "csv":
+    elif ftype == 'excel':
+        df = pd.read_excel(fp, transform['sheet'])
+    elif ftype != "csv":
         df = netcdf2df(fp)
     else:
         df = pd.read_csv(fp)
 
+    # Make mapper contain only keys for date, geo, and feature.
+    mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
+    #norm, renamed_col_dict = normalizer(df, mapper, admin)
     norm = normalizer(df, mapper, admin)
 
     # Separate string values from others
@@ -778,20 +829,116 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     del(norm['type'])
 
     # Testing
-    """print('\n', norm.head(50))
+    """
+    print('\n', norm.head(50))
     print('\n', norm.tail(50))
-    print('\n', norm_str.head(50))"""
+    print('\n', norm_str.head(50))
+    print('\n', renamed_col_dict)
+    """
 
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
         norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
-    return norm.append(norm_str)
+    return norm.append(norm_str) #, renamed_col_dict
+
+def raster2df(
+    InRaster: str,
+    feature_name: str = "feature",
+    band: int = 1,
+    nodataval: int = -9999,
+    date: str = None,
+) -> pd.DataFrame:
+    """
+    Description
+    -----------
+    Takes the path of a raster (.tiff) file and produces a Geopandas Data Frame.
+
+    Parameters
+    ----------
+    InRaster: str
+        the path of the input raster file
+    feature_name: str
+        the name of the feature represented by the pixel values
+    band: int, default 1
+        the band to operate on
+    nodataval: int, default -9999
+        the value for no data pixels
+    date: str, default None
+        date associated with the raster (if any)
+
+    Examples
+    --------
+    Converting a geotiff of rainfall data into a geopandas dataframe
+
+    >>> df = raster2df('path_to_raster.geotiff', 'rainfall', band=1)
+
+    """
+
+    # open the raster and get some properties
+    ds = gdal.OpenShared(InRaster, gdalconst.GA_ReadOnly)
+    GeoTrans = ds.GetGeoTransform()
+    ColRange = range(ds.RasterXSize)
+    RowRange = range(ds.RasterYSize)
+    rBand = ds.GetRasterBand(band)  # first band
+    nData = rBand.GetNoDataValue()
+    if nData == None:
+        logging.info(f"No nodataval found, setting to {nodataval}")
+        nData = np.float32(nodataval)  # set it to something if not set
+    else:
+        logging.info(f"Nodataval is: {nData}")
+
+    # specify the center offset (takes the point in middle of pixel)
+    HalfX = GeoTrans[1] / 2
+    HalfY = GeoTrans[5] / 2
+
+    # Check that NoDataValue is of the same type as the raster data
+    RowData = rBand.ReadAsArray(0, 0, ds.RasterXSize, 1)[0]
+    if type(nData) != type(RowData[0]):
+        logging.warning(
+            f"NoData type mismatch: NoDataValue is type {type(nData)} and raster data is type {type(RowData[0])}"
+        )
+
+    points = []
+    for ThisRow in RowRange:
+        RowData = rBand.ReadAsArray(0, ThisRow, ds.RasterXSize, 1)[0]
+        for ThisCol in ColRange:
+            # need to exclude NaN values since there is no nodataval
+            if (RowData[ThisCol] != nData) and not (np.isnan(RowData[ThisCol])):
+
+                # TODO: implement filters on valid pixels
+                # for example, the below would ensure pixel values are between -100 and 100
+                # if (RowData[ThisCol] <= 100) and (RowData[ThisCol] >= -100):
+
+                X = GeoTrans[0] + (ThisCol * GeoTrans[1])
+                Y = GeoTrans[3] + (
+                    ThisRow * GeoTrans[5]
+                )  # Y is negative so it's a minus
+                # this gives the upper left of the cell, offset by half a cell to get centre
+                X += HalfX
+                Y += HalfY
+
+                points.append([X, Y, RowData[ThisCol]])
+
+    df = pd.DataFrame(points, columns=["longitude", "latitude", feature_name])
+    if date:
+        df["date"] = date
+    return df
 
 # Testing
 """
-mp = 'examples/causemosify-tests/test_file_5_schema2.json'
-fp = 'examples/causemosify-tests/test_file_5_schema2.csv'
+mp = 'examples/causemosify-tests/mixmasta_ready_annotations_error.json'
+fp = 'examples/causemosify-tests/raw_data_error.csv'
 geo = 'admin3'
-outf = 'examples/causemosify-tests/test_file_5_schema2'
+outf = 'examples/causemosify-tests/testing'
+
 process(fp, mp, geo, outf)
+
+
+mapper = json.loads(open(mp).read())
+mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
+df = pd.read_csv(fp)
+norm, changed_cols = normalizer(df, mapper, geo)
+print('\n', norm.head(50))
+print('\n', norm.tail(50))
+
 """
