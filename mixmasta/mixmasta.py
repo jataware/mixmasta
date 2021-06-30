@@ -406,7 +406,7 @@ def netcdf2df(netcdf: str) -> pd.DataFrame:
 
     return df
 
-def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dict):
+def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     """
     Description
     -----------
@@ -772,9 +772,9 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
             df_out[c] = None
 
     # Handle any renamed cols being renamed.
-    renamed_col_dict = audit_renamed_col_dict(renamed_col_dict)
+    #renamed_col_dict = audit_renamed_col_dict(renamed_col_dict)
 
-    return df_out[col_order], renamed_col_dict
+    return df_out[col_order]#, renamed_col_dict
 
 def process(fp: str, mp: str, admin: str, output_file: str):
     """
@@ -796,20 +796,17 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     # "meta" portion of schema specifies transformation type
     transform = mapper["meta"]
 
-    # Make mapper contain only keys for date, geo, and feature.
-    mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
-
     ftype = transform["ftype"]
-    if ftype == "Geotiff":
-        if transform["Date"] == "":
+    if ftype == "geotiff":
+        if transform["date"] == "":
             d = None
         else:
-            d = transform["Date"]
+            d = transform["date"]
         df = raster2df(
             fp,
-            transform["Feature_name"],
-            int(transform["Band"]),
-            int(transform["Null_val"]),
+            transform["feature_name"],
+            int(transform["band"]),
+            int(transform["null_val"]),
             d,
         )
     elif ftype == 'excel':
@@ -819,7 +816,10 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     else:
         df = pd.read_csv(fp)
 
-    norm, renamed_col_dict = normalizer(df, mapper, admin)
+    # Make mapper contain only keys for date, geo, and feature.
+    mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
+    #norm, renamed_col_dict = normalizer(df, mapper, admin)
+    norm = normalizer(df, mapper, admin)
 
     # Separate string values from others
     norm['type'] = norm[['value']].applymap(type)
@@ -829,15 +829,17 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     del(norm['type'])
 
     # Testing
+    """
     print('\n', norm.head(50))
     print('\n', norm.tail(50))
     print('\n', norm_str.head(50))
     print('\n', renamed_col_dict)
+    """
 
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
         norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
-    return norm.append(norm_str), renamed_col_dict
+    return norm.append(norm_str) #, renamed_col_dict
 
 def raster2df(
     InRaster: str,
@@ -923,17 +925,15 @@ def raster2df(
     return df
 
 # Testing
-
-#mp = 'examples/causemosify-tests/test_file_2_schema2.json'
-#fp = 'examples/causemosify-tests/test_file_2_schema2.csv'
-mp = 'examples/causemosify-tests/mixmasta_ready_annotations_date.json'
-fp = 'examples/causemosify-tests/raw_data_date.xlsx'
+"""
+mp = 'examples/causemosify-tests/mixmasta_ready_annotations_error.json'
+fp = 'examples/causemosify-tests/raw_data_error.csv'
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
 process(fp, mp, geo, outf)
 
-"""
+
 mapper = json.loads(open(mp).read())
 mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 df = pd.read_csv(fp)
