@@ -209,8 +209,24 @@ def generate_timestamp(series: pd.Series, date_mapper: dict, column_name: str) -
     timestamp =  '/'.join([str(month),str(day),str(year)])
     return pd.Series(timestamp, index=[column_name])
 
+def generate_timestamp_format(date_mapper: dict) -> str:
+    """
+    Description
+    -----------
+    Generates a the time format for day,month,year dates based on each's
+    specified time_format.
 
-def generate_timestamp_format(date_mapper) -> str:
+    Parameters
+    ----------
+    date_mapper: dict
+        a dictionary for the schema mapping (JSON) for the dataframe filtered
+        for "date_type" equal to Day, Month, or Year.
+
+    Output
+    ------
+    e.g. "%m/%d/%Y"
+    """
+
     day = "%d"
     month = "%m"
     year = "%y"
@@ -492,7 +508,27 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
                 renamed_col_dict[ str([kk]) ] = staple_col_name
             elif date_dict["date_type"] in ["day","month","year"]:
                 primary_date_group_mapper[kk] = date_dict
-        elif "qualifies" in date_dict and date_dict["qualifies"]:
+
+        else:
+            if kk in other_time_cols and date_dict["date_type"] == "date":
+                # Convert all date/time to epoch time if not already.
+                df[kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
+                # If three are no assigned primary_time columns, make this the
+                # primary_time timestamp column, and keep as a feature so the
+                # column_name meaning is not lost.
+                if not primary_time_cols and not "timestamp" in df.columns:
+                    df.rename(columns={kk: "timestamp"}, inplace=True)
+                    renamed_col_dict[ str([kk]) ] = staple_col_name
+                # All not primary_time, not associated_columns fields are pushed to features.
+                features.append(kk)
+
+            elif date_dict["date_type"] in ["day","month","year"] and 'associated_columns' in date_dict and date_dict["associated_columns"]:
+                # Various date columns have been associated by the user and are not primary_date.
+                # convert them to epoch then store them as a feature
+                # (instead of storing them as separate uncombined features).
+                other_date_group_mapper[kk] = date_dict
+
+        if "qualifies" in date_dict and date_dict["qualifies"]:
             # Note that any "qualifier" column that is not primary geo/date
             # will just be lopped on to the right as its own column. It's
             # column name will just be the name and Uncharted will deal with
@@ -508,29 +544,10 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
                 else:
                     qualified_col_dict[k] = [kk]
 
-        else:
-            if kk in other_time_cols and date_dict["date_type"] == "date":
-                # Convert all date/time to epoch time if not already.
-                df[kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
-                # If three are no assigned primary_time columns, make this the
-                # primary_time timestamp column, and keep as a feature so the
-                # column_name meaning is not lost.
-                if not primary_time_cols and not "timestamp" in df.columns:
-                    df.rename(columns={kk: "timestamp"}, inplace=True)
-                    renamed_col_dict[ str([kk]) ] = staple_col_name
-            elif date_dict["date_type"] in ["day","month","year"] and 'associated_columns' in date_dict and date_dict["associated_columns"]:
-                # Various date columns have been associated by the user and are not primary_date.
-                # convert them to epoch then store them as a feature
-                # (instead of storing them as separate uncombined features).
-                other_date_group_mapper[kk] = date_dict
-                continue
-            # All not primary_time, not associated_columns fields are pushed to features.
-            features.append(kk)
-
     if primary_date_group_mapper:
-        # Applied when there were primary_date year,month,day fields above. These need to be combined
+        # Applied when there were primary_date year,month,day fields above.
+        # These need to be combined
         # into a date and then epoch time, and added as the timestamp field.
-
 
         # Create a separate df of the associated date fields. This avoids
         # pandas upcasting the series dtypes on df.apply(); e.g., int to float,
@@ -782,7 +799,8 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     # Make mapper contain only keys for date, geo, and feature.
     mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 
-    if transform["ftype"] == "Geotiff":
+    ftype = transform["ftype"]
+    if ftype == "Geotiff":
         if transform["Date"] == "":
             d = None
         else:
@@ -794,8 +812,9 @@ def process(fp: str, mp: str, admin: str, output_file: str):
             int(transform["Null_val"]),
             d,
         )
-
-    elif transform["ftype"] != "csv":
+    elif ftype == 'excel':
+        df = pd.read_excel(fp, transform['sheet'])
+    elif ftype != "csv":
         df = netcdf2df(fp)
     else:
         df = pd.read_csv(fp)
@@ -908,17 +927,18 @@ def raster2df(
 #mp = 'examples/causemosify-tests/test_file_2_schema2.json'
 #fp = 'examples/causemosify-tests/test_file_2_schema2.csv'
 mp = 'examples/causemosify-tests/mixmasta_ready_annotations_date.json'
-fp = 'examples/causemosify-tests/raw_data_date.csv'
+fp = 'examples/causemosify-tests/raw_data_date.xlsx'
 geo = 'admin3'
-#outf = 'examples/causemosify-tests/test_file_5_schema2'
+outf = 'examples/causemosify-tests/testing'
 
+process(fp, mp, geo, outf)
 
+"""
 mapper = json.loads(open(mp).read())
 mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
-
 df = pd.read_csv(fp)
 norm, changed_cols = normalizer(df, mapper, geo)
 print('\n', norm.head(50))
 print('\n', norm.tail(50))
 
-#process(fp, mp, geo, outf)
+"""
