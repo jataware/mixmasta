@@ -37,11 +37,11 @@ def audit_renamed_col_dict(dct: dict) -> dict:
     # {"['country']": 'country_non_primary', "['country_non_primary']": 'country' }
 
     remove_these = []
-    for v in dct.values():
-        l = [v]
-        if str([v]) in dct.keys():
-            remove_these.append(str([v]))
-            print(str([v]), ' scheduled for termination' )
+    for val in dct.values():
+
+        if str([val]) in dct.keys():
+            remove_these.append(str([val]))
+            print(str([val]), ' scheduled for termination' )
 
     return dct
 
@@ -71,10 +71,12 @@ def format_time(t: str, time_format: str, validate: bool = True) -> int:
         return t_
     except Exception as e:
         if t.endswith(' 00:00:00'):
-            # Depending on the date format, pandas will read the date as a Timestamp,
-            # so here it is a str with format '2021-03-26 00:00:00'. For now,
-            # handle this single case until there is time for a more comprehensive
-            # solution.
+            # Depending on the date format, pandas.read_excel will read the
+            # date as a Timestamp, so here it is a str with format
+            # '2021-03-26 00:00:00'. For now, handle this single case until
+            # there is time for a more comprehensive solution e.g. add a custom
+            # date_parser function that doesn't parse diddly/squat to
+            # pandas.read_excel() in process().
             return format_time(t.replace(' 00:00:00', ''), time_format, validate)
         print(e)
         if validate:
@@ -516,7 +518,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 primary_date_group_mapper[kk] = date_dict
 
         else:
-            if kk in other_time_cols and date_dict["date_type"] == "date":
+            if date_dict["date_type"] == "date":
                 # Convert all date/time to epoch time if not already.
                 df[kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
                 # If three are no assigned primary_time columns, make this the
@@ -533,6 +535,9 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 # convert them to epoch then store them as a feature
                 # (instead of storing them as separate uncombined features).
                 other_date_group_mapper[kk] = date_dict
+
+            else:
+                features.append(kk)
 
         if "qualifies" in date_dict and date_dict["qualifies"]:
             # Note that any "qualifier" column that is not primary geo/date
@@ -939,8 +944,8 @@ def raster2df(
 
 # Testing
 
-mp = 'examples/causemosify-tests/mixmasta_ready_annotations_error2.json'
-fp = 'examples/causemosify-tests/raw_data_error2.xlsx'
+mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
+fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
