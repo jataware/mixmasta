@@ -287,7 +287,7 @@ def handle_colname_collisions(df: pd.DataFrame, mapper: dict, protected_cols: li
                 dct["name"] = dct["name"] + suffix
             elif "qualifies" in dct and dct["qualifies"]:
                 # change any instances of this column name qualified by another field
-                dct["qualifies"] = [w.replace(w, w + suffix) for w in dct["qualifies"] if w in collision_list]
+                dct["qualifies"] = [w.replace(w, w + suffix) if w in collision_list else w for w in dct["qualifies"] ]
             elif "associated_columns" in dct and dct["associated_columns"]:
                 # change any instances of this column name in an associated_columns dict
                 dct["associated_columns"] = {k: v.replace(v, v + suffix) if v in collision_list else v for k, v in dct["associated_columns"].items() }
@@ -472,6 +472,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         "lat",
         "lng",
     ]
+
 
 
     # Create a dictionary of list: colnames: new col name, and modify df and
@@ -946,8 +947,8 @@ def raster2df(
 
 # Testing
 """
-mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
-fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
+mp = 'examples/causemosify-tests/mixmasta_ready_annotations_qualifies.json'
+fp = 'examples/causemosify-tests/raw_data_qualifies.csv'
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
