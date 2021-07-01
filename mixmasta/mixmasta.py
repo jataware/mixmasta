@@ -68,9 +68,14 @@ def format_time(t: str, time_format: str, validate: bool = True) -> int:
 
     try:
         t_ = int(datetime.strptime(t, time_format).timestamp())
-
         return t_
     except Exception as e:
+        if t.endswith(' 00:00:00'):
+            # Depending on the date format, pandas will read the date as a Timestamp,
+            # so here it is a str with format '2021-03-26 00:00:00'. For now,
+            # handle this single case until there is time for a more comprehensive
+            # solution.
+            return format_time(t.replace(' 00:00:00', ''), time_format, validate)
         print(e)
         if validate:
             raise Exception(e)
@@ -474,7 +479,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
 
     # dictionary for columns qualified by another column.
     # key: qualified column
-    # value: list of columns that qualifies key column
+    # value: list of columns that qualify key column
     qualified_col_dict = {}
 
     # subset dataframe for only columns specified in mapper schema.
@@ -489,6 +494,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     features = []
     primary_date_group_mapper = {}
     other_date_group_mapper = {}
+
     for date_dict in mapper["date"]:
         kk = date_dict["name"]
         if kk in primary_time_cols:
@@ -724,48 +730,55 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             protected_cols.extend(v)
             col_order.extend(v)
 
-    df_out = pd.DataFrame()
-    for feat in features:
-        using_cols = protected_cols.copy()
 
-        if feat in qualified_col_dict:
-            # dict value is a list, so extend.
-            using_cols.extend(qualified_col_dict[feat])
-            col_order.extend(qualified_col_dict[feat])
+    # Prepare output by
+    # 1. if there are no features, simply reduce the dataframe.
+    # or, 2.iterating features to add to feature adn value columns.
+    #
+    if not features:
+        df_out = df[protected_cols]
+    else:
+        df_out = pd.DataFrame()
+        for feat in features:
+            using_cols = protected_cols.copy()
 
-        join_overlap = False
-        try:
-            df_ = df[using_cols + [feat+'_mixmasta_left']].copy()
-            join_overlap = True
-        except:
-            df_ = df[using_cols + [feat]].copy()
+            if feat in qualified_col_dict:
+                # dict value is a list, so extend.
+                using_cols.extend(qualified_col_dict[feat])
+                col_order.extend(qualified_col_dict[feat])
 
-        try:
-            if mapper[feat]["new_col_name"] == None:
+            join_overlap = False
+            try:
+                df_ = df[using_cols + [feat+'_mixmasta_left']].copy()
+                join_overlap = True
+            except:
+                df_ = df[using_cols + [feat]].copy()
+
+            try:
+                if mapper[feat]["new_col_name"] == None:
+                    df_["feature"] = feat
+                else:
+                    df_["feature"] = mapper[feat]["new_col_name"]
+            except:
                 df_["feature"] = feat
-            else:
-                df_["feature"] = mapper[feat]["new_col_name"]
-        except:
-            df_["feature"] = feat
 
-        if join_overlap:
-            df_.rename(columns={f"{feat}_mixmasta_left": "value"}, inplace=True)
-        else:
-            df_.rename(columns={feat: "value"}, inplace=True)
-
-
-        # Add feature/value for epochtime as object adds it without decimal
-        # places, but it is still saved as a double in the parquet file.
-        if len(df_out) == 0:
-            if feat in other_time_cols:
-                df_out = df_.astype({'value': object})
+            if join_overlap:
+                df_.rename(columns={f"{feat}_mixmasta_left": "value"}, inplace=True)
             else:
-                df_out = df_
-        else:
-            if feat in other_time_cols:
-                df_out = df_out.append(df_.astype({'value': object}))
+                df_.rename(columns={feat: "value"}, inplace=True)
+
+            # Add feature/value for epochtime as object adds it without decimal
+            # places, but it is still saved as a double in the parquet file.
+            if len(df_out) == 0:
+                if feat in other_time_cols:
+                    df_out = df_.astype({'value': object})
+                else:
+                    df_out = df_
             else:
-                df_out = df_out.append(df_)
+                if feat in other_time_cols:
+                    df_out = df_out.append(df_.astype({'value': object}))
+                else:
+                    df_out = df_out.append(df_)
 
     for c in col_order:
         if c not in df_out:
@@ -829,12 +842,12 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     del(norm['type'])
 
     # Testing
-    """
+
     print('\n', norm.head(50))
     print('\n', norm.tail(50))
     print('\n', norm_str.head(50))
-    print('\n', renamed_col_dict)
-    """
+    #print('\n', renamed_col_dict)
+
 
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
@@ -925,15 +938,15 @@ def raster2df(
     return df
 
 # Testing
-"""
-mp = 'examples/causemosify-tests/mixmasta_ready_annotations_error.json'
-fp = 'examples/causemosify-tests/raw_data_error.csv'
+
+mp = 'examples/causemosify-tests/mixmasta_ready_annotations_error2.json'
+fp = 'examples/causemosify-tests/raw_data_error2.xlsx'
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
 process(fp, mp, geo, outf)
 
-
+"""
 mapper = json.loads(open(mp).read())
 mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 df = pd.read_csv(fp)
