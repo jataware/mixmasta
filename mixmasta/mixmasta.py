@@ -31,17 +31,21 @@ logger = logging.getLogger(__name__)
 
 def audit_renamed_col_dict(dct: dict) -> dict:
     # Handle edge cases where a col could be renamed back to itself.
-    # example: no primary_geo, but country is present. Becase it is a protected
+    # example: no primary_geo, but country is present. Because it is a protected
     # col name, it would be renamed country_non_primary. Later, it would be set
     # as primary_geo country, and the pair added to renamed_col_dict again:
     # {"['country']": 'country_non_primary', "['country_non_primary']": 'country' }
 
-    remove_these = []
-    for val in dct.values():
+    remove_these = set()
+    for k, v in dct.items():
+        keystr = k.strip("'[]")
+        value_list_string = str([v])
+        if value_list_string in dct.keys() and keystr in dct.values():
+            remove_these.add(value_list_string)
+            remove_these.add(k)
 
-        if str([val]) in dct.keys():
-            remove_these.append(str([val]))
-            print(str([val]), ' scheduled for termination' )
+    for k in remove_these:
+        dct.pop(k, None)
 
     return dct
 
@@ -711,14 +715,14 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     # perform geocoding if lat/lng are present
     if "lat" in df and "lng" in df:
         df = geocode(admin, df, x="lng", y="lat")
-    elif len(primary_geo_cols) == 0 and "country" in df:
-        # Correct any misspellings etc. in state and admin areas only when
+    elif "country" in df:
+        # Correct any misspellings etc. in state and admin areas when not
+        # geocoding lat and lng above.
         df = match_geo_names(admin, df)
 
     df_geo_cols = [i for i in df.columns if 'mixmasta_geocoded' in i]
     for c in df_geo_cols:
         df.rename(columns={c: c.replace('_mixmasta_geocoded','')}, inplace=True)
-
 
     # protected_cols are the required_cols present in the submitted dataframe.
     protected_cols = list(set(required_cols) & set(df.columns))
@@ -735,11 +739,9 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             protected_cols.extend(v)
             col_order.extend(v)
 
-
     # Prepare output by
     # 1. if there are no features, simply reduce the dataframe.
     # or, 2.iterating features to add to feature adn value columns.
-    #
     if not features:
         df_out = df[protected_cols]
     else:
@@ -847,12 +849,12 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     del(norm['type'])
 
     # Testing
-
+    """
     print('\n', norm.head(50))
     print('\n', norm.tail(50))
     print('\n', norm_str.head(50))
     #print('\n', renamed_col_dict)
-
+    """
 
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if len(norm_str) > 0:
@@ -943,7 +945,7 @@ def raster2df(
     return df
 
 # Testing
-
+"""
 mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
 fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
 geo = 'admin3'
@@ -951,7 +953,7 @@ outf = 'examples/causemosify-tests/testing'
 
 process(fp, mp, geo, outf)
 
-"""
+
 mapper = json.loads(open(mp).read())
 mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 df = pd.read_csv(fp)
