@@ -31,17 +31,21 @@ logger = logging.getLogger(__name__)
 
 def audit_renamed_col_dict(dct: dict) -> dict:
     # Handle edge cases where a col could be renamed back to itself.
-    # example: no primary_geo, but country is present. Becase it is a protected
+    # example: no primary_geo, but country is present. Because it is a protected
     # col name, it would be renamed country_non_primary. Later, it would be set
     # as primary_geo country, and the pair added to renamed_col_dict again:
     # {"['country']": 'country_non_primary', "['country_non_primary']": 'country' }
 
-    remove_these = []
-    for v in dct.values():
-        l = [v]
-        if str([v]) in dct.keys():
-            remove_these.append(str([v]))
-            print(str([v]), ' scheduled for termination' )
+    remove_these = set()
+    for k, v in dct.items():
+        keystr = k.strip("'[]")
+        value_list_string = str([v])
+        if value_list_string in dct.keys() and keystr in dct.values():
+            remove_these.add(value_list_string)
+            remove_these.add(k)
+
+    for k in remove_these:
+        dct.pop(k, None)
 
     return dct
 
@@ -68,9 +72,16 @@ def format_time(t: str, time_format: str, validate: bool = True) -> int:
 
     try:
         t_ = int(datetime.strptime(t, time_format).timestamp())
-
         return t_
     except Exception as e:
+        if t.endswith(' 00:00:00'):
+            # Depending on the date format, pandas.read_excel will read the
+            # date as a Timestamp, so here it is a str with format
+            # '2021-03-26 00:00:00'. For now, handle this single case until
+            # there is time for a more comprehensive solution e.g. add a custom
+            # date_parser function that doesn't parse diddly/squat to
+            # pandas.read_excel() in process().
+            return format_time(t.replace(' 00:00:00', ''), time_format, validate)
         print(e)
         if validate:
             raise Exception(e)
@@ -474,7 +485,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
 
     # dictionary for columns qualified by another column.
     # key: qualified column
-    # value: list of columns that qualifies key column
+    # value: list of columns that qualify key column
     qualified_col_dict = {}
 
     # subset dataframe for only columns specified in mapper schema.
@@ -489,6 +500,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     features = []
     primary_date_group_mapper = {}
     other_date_group_mapper = {}
+
     for date_dict in mapper["date"]:
         kk = date_dict["name"]
         if kk in primary_time_cols:
@@ -510,7 +522,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 primary_date_group_mapper[kk] = date_dict
 
         else:
-            if kk in other_time_cols and date_dict["date_type"] == "date":
+            if date_dict["date_type"] == "date":
                 # Convert all date/time to epoch time if not already.
                 df[kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
                 # If three are no assigned primary_time columns, make this the
@@ -527,6 +539,9 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 # convert them to epoch then store them as a feature
                 # (instead of storing them as separate uncombined features).
                 other_date_group_mapper[kk] = date_dict
+
+            else:
+                features.append(kk)
 
         if "qualifies" in date_dict and date_dict["qualifies"]:
             # Note that any "qualifier" column that is not primary geo/date
@@ -700,14 +715,14 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     # perform geocoding if lat/lng are present
     if "lat" in df and "lng" in df:
         df = geocode(admin, df, x="lng", y="lat")
-    elif len(primary_geo_cols) == 0 and "country" in df:
-        # Correct any misspellings etc. in state and admin areas only when
+    elif "country" in df:
+        # Correct any misspellings etc. in state and admin areas when not
+        # geocoding lat and lng above.
         df = match_geo_names(admin, df)
 
     df_geo_cols = [i for i in df.columns if 'mixmasta_geocoded' in i]
     for c in df_geo_cols:
         df.rename(columns={c: c.replace('_mixmasta_geocoded','')}, inplace=True)
-
 
     # protected_cols are the required_cols present in the submitted dataframe.
     protected_cols = list(set(required_cols) & set(df.columns))
@@ -724,48 +739,53 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             protected_cols.extend(v)
             col_order.extend(v)
 
-    df_out = pd.DataFrame()
-    for feat in features:
-        using_cols = protected_cols.copy()
+    # Prepare output by
+    # 1. if there are no features, simply reduce the dataframe.
+    # or, 2.iterating features to add to feature adn value columns.
+    if not features:
+        df_out = df[protected_cols]
+    else:
+        df_out = pd.DataFrame()
+        for feat in features:
+            using_cols = protected_cols.copy()
 
-        if feat in qualified_col_dict:
-            # dict value is a list, so extend.
-            using_cols.extend(qualified_col_dict[feat])
-            col_order.extend(qualified_col_dict[feat])
+            if feat in qualified_col_dict:
+                # dict value is a list, so extend.
+                using_cols.extend(qualified_col_dict[feat])
+                col_order.extend(qualified_col_dict[feat])
 
-        join_overlap = False
-        try:
-            df_ = df[using_cols + [feat+'_mixmasta_left']].copy()
-            join_overlap = True
-        except:
-            df_ = df[using_cols + [feat]].copy()
+            join_overlap = False
+            try:
+                df_ = df[using_cols + [feat+'_mixmasta_left']].copy()
+                join_overlap = True
+            except:
+                df_ = df[using_cols + [feat]].copy()
 
-        try:
-            if mapper[feat]["new_col_name"] == None:
+            try:
+                if mapper[feat]["new_col_name"] == None:
+                    df_["feature"] = feat
+                else:
+                    df_["feature"] = mapper[feat]["new_col_name"]
+            except:
                 df_["feature"] = feat
-            else:
-                df_["feature"] = mapper[feat]["new_col_name"]
-        except:
-            df_["feature"] = feat
 
-        if join_overlap:
-            df_.rename(columns={f"{feat}_mixmasta_left": "value"}, inplace=True)
-        else:
-            df_.rename(columns={feat: "value"}, inplace=True)
-
-
-        # Add feature/value for epochtime as object adds it without decimal
-        # places, but it is still saved as a double in the parquet file.
-        if len(df_out) == 0:
-            if feat in other_time_cols:
-                df_out = df_.astype({'value': object})
+            if join_overlap:
+                df_.rename(columns={f"{feat}_mixmasta_left": "value"}, inplace=True)
             else:
-                df_out = df_
-        else:
-            if feat in other_time_cols:
-                df_out = df_out.append(df_.astype({'value': object}))
+                df_.rename(columns={feat: "value"}, inplace=True)
+
+            # Add feature/value for epochtime as object adds it without decimal
+            # places, but it is still saved as a double in the parquet file.
+            if len(df_out) == 0:
+                if feat in other_time_cols:
+                    df_out = df_.astype({'value': object})
+                else:
+                    df_out = df_
             else:
-                df_out = df_out.append(df_)
+                if feat in other_time_cols:
+                    df_out = df_out.append(df_.astype({'value': object}))
+                else:
+                    df_out = df_out.append(df_)
 
     for c in col_order:
         if c not in df_out:
@@ -833,7 +853,7 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     print('\n', norm.head(50))
     print('\n', norm.tail(50))
     print('\n', norm_str.head(50))
-    print('\n', renamed_col_dict)
+    #print('\n', renamed_col_dict)
     """
 
     norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
@@ -926,8 +946,8 @@ def raster2df(
 
 # Testing
 """
-mp = 'examples/causemosify-tests/mixmasta_ready_annotations_error.json'
-fp = 'examples/causemosify-tests/raw_data_error.csv'
+mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
+fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
