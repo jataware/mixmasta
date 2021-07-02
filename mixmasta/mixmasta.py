@@ -386,12 +386,12 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
     countries = df["country"].unique()
 
     # Correct country names.
-    #gadm_country_list = gadm["country"].unique()
-    #unknowns = ~df.country.isin(gadm_country_list).country.tolist()
-    #for unk in unknowns:
-    #    match = fuzzywuzzy.process.extractOne(unk, gadm_country_list, scorer=fuzz.ratio)
-    #    if match != None:
-    #        df.loc[df.country == unk, 'country'] = match[0]
+    gadm_country_list = gadm["country"].unique()
+    unknowns = df[~df.country.isin(gadm_country_list)].country.tolist()
+    for unk in unknowns:
+        match = fuzzywuzzy.process.extractOne(unk, gadm_country_list, scorer=fuzz.ratio)
+        if match != None:
+            df.loc[df.country == unk, 'country'] = match[0]
 
     # Filter GADM dicitonary for only those countries (ie. speed up)
     gadm = gadm[gadm["country"].isin(countries)]
@@ -911,7 +911,7 @@ def process(fp: str, mp: str, admin: str, output_file: str):
         norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
 
     # Testing
-    """
+
     #print('\n', norm.append(norm_str).head(50))
     #print('\n', norm.append(norm_str).tail(50))
 
@@ -919,7 +919,7 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     print('\n', norm.tail(50))
     print('\n', norm_str.head(50))
     print('\n', renamed_col_dict)
-    """
+
 
 
     return norm.append(norm_str), renamed_col_dict
@@ -1008,14 +1008,14 @@ def raster2df(
     return df
 
 # Testing
-"""
+
 mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
 fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
 process(fp, mp, geo, outf)
-
+"""
 mapper = json.loads(open(mp).read())
 mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 df = pd.read_csv(fp)
