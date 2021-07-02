@@ -17,6 +17,7 @@ from shapely import speedups
 from shapely.geometry import Point
 
 from pathlib import Path
+import pkg_resources
 
 import fuzzywuzzy
 from fuzzywuzzy import fuzz
@@ -62,6 +63,20 @@ def audit_renamed_col_dict(dct: dict) -> dict:
         dct.pop(k, None)
 
     return dct
+
+def fix_qualified_col_dict(qualified_col_dict: dict, assoc_fields: list, new_column_name: str) -> dict:
+    """
+    # Handle edge case of each date field in assoc_fields qualifying
+    # the same column e.g. day/month/year are associated and qualify
+    # a field. In this case, the new_column_name
+
+    qualified_col_dict: {'pop': ['month_column', 'day_column', 'year_column']}
+    assoc_fields:       ['month_column', 'day_column', 'year_column']
+    new_column_name:    day_columnmonth_columnyear_column
+
+    """
+    #print(qualified_col_dict, assoc_fields, new_column_name)
+    pass
 
 def format_time(t: str, time_format: str, validate: bool = True) -> int:
     """
@@ -284,12 +299,17 @@ def get_iso_country_dict(iso_list: list) -> dict:
     -------
     dict:
         key: iso code; value: country name
-
     """
     dct = {}
     if iso_list:
-        path = Path(__file__).parent / "data/iso_lookup.csv"
-        iso_df = pd.read_csv(path)
+        iso_df = pd.DataFrame
+        try:
+            # The necessary code to load from pkg doesn't currently work in VS
+            # Code Debug, so wrap in try/except.
+            iso_df = pd.read_csv(pkg_resources.resource_stream(__name__, 'data/iso_lookup.csv'))
+        except:
+            path = Path(__file__).parent / "data/iso_lookup.csv"
+            iso_df = pd.read_csv(path)
 
         if iso_df.empty:
             return dct
@@ -302,7 +322,6 @@ def get_iso_country_dict(iso_list: list) -> dict:
             for iso in iso_list:
                 if iso in iso_df["iso3"].values:
                     dct[iso] = iso_df.loc[iso_df["iso3"] == iso]["country"].item()
-
 
     return dct
 
@@ -707,6 +726,11 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
         if new_column_name != "timestamp":
             features.append(new_column_name)
 
+            # Handle edge case of each date field in assoc_fields qualifying
+            # the same column e.g. day/month/year are associated and qualify
+            # a field. In this case, the new_column_name
+            #print(qualified_col_dict, assoc_fields, new_column_name)
+
     for geo_dict in mapper["geo"]:
         kk = geo_dict["name"]
         if kk in primary_geo_cols:
@@ -1059,14 +1083,14 @@ def raster2df(
     return df
 
 # Testing
-"""
+
 mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
 fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
 process(fp, mp, geo, outf)
-
+"""
 mapper = json.loads(open(mp).read())
 mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 df = pd.read_csv(fp)
