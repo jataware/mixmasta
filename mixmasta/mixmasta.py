@@ -51,9 +51,11 @@ def audit_renamed_col_dict(dct: dict) -> dict:
     """
     remove_these = set()
     for k, v in dct.items():
-        if str(v) in dct.keys() and [k] in dct.values():
-            remove_these.add(v)
-            remove_these.add([k])
+        vstr = "".join(v)
+        print(v, vstr, k, [k])
+        if vstr in dct.keys() and [k] in dct.values():
+            remove_these.add(vstr)
+            remove_these.add(k)
 
     for k in remove_these:
         dct.pop(k, None)
@@ -910,15 +912,15 @@ def process(fp: str, mp: str, admin: str, output_file: str):
         norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
 
     # Testing
-    """
-    print('\n', norm.append(norm_str).head(50))
-    print('\n', norm.append(norm_str).tail(50))
+
+    #print('\n', norm.append(norm_str).head(50))
+    #print('\n', norm.append(norm_str).tail(50))
 
     print('\n', norm.head(50))
     print('\n', norm.tail(50))
     print('\n', norm_str.head(50))
     print('\n', renamed_col_dict)
-    """
+
 
 
     return norm.append(norm_str), renamed_col_dict
@@ -1007,14 +1009,14 @@ def raster2df(
     return df
 
 # Testing
-"""
+
 mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
 fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
 process(fp, mp, geo, outf)
-
+"""
 mapper = json.loads(open(mp).read())
 mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 df = pd.read_csv(fp)
