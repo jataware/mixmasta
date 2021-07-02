@@ -52,7 +52,6 @@ def audit_renamed_col_dict(dct: dict) -> dict:
     remove_these = set()
     for k, v in dct.items():
         vstr = "".join(v)
-        print(v, vstr, k, [k])
         if vstr in dct.keys() and [k] in dct.values():
             remove_these.add(vstr)
             remove_these.add(k)
@@ -555,12 +554,12 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
                 df[kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
                 staple_col_name = "timestamp"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-                renamed_col_dict[ staple_col_name ] = [kk]
+                # renamed_col_dict[ staple_col_name ] = [kk] # 7/2/2021 do not include primary cols
             elif date_dict["date_type"] == "epoch":
                 # rename epoch time column as 'timestamp'
                 staple_col_name = "timestamp"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-                renamed_col_dict[ staple_col_name ] = [kk]
+                #renamed_col_dict[ staple_col_name ] = [kk] # 7/2/2021 do not include primary cols
             elif date_dict["date_type"] in ["day","month","year"]:
                 primary_date_group_mapper[kk] = date_dict
 
@@ -623,7 +622,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
         df['timestamp'] = df["timestamp"].apply(lambda x: format_time(str(x), time_formatter, validate=False))
 
         # Let SpaceTag know those date columns were renamed to timestamp.
-        renamed_col_dict[ "timestamp" ] = assoc_fields
+        #renamed_col_dict[ "timestamp" ] = assoc_fields # 7/2/2021 do not include primary cols
 
     while other_date_group_mapper:
         # Various date columns have been associated by the user and are not primary_date.
@@ -672,11 +671,11 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
             if geo_dict["geo_type"] == "latitude":
                 staple_col_name = "lat"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-                renamed_col_dict[staple_col_name] = [kk]
+                #renamed_col_dict[staple_col_name] = [kk] # 7/2/2021 do not include primary cols
             elif geo_dict["geo_type"] == "longitude":
                 staple_col_name = "lng"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-                renamed_col_dict[staple_col_name] = [kk]
+                #renamed_col_dict[staple_col_name] = [kk] # 7/2/2021 do not include primary cols
             elif geo_dict["geo_type"] == "coordinates":
                 c_f = geo_dict["coord_format"]
                 coords = df[kk].values
@@ -693,12 +692,12 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
                 # force the country column to be named country
                 staple_col_name = "country"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-                renamed_col_dict[staple_col_name] = [kk]
+                #renamed_col_dict[staple_col_name] = [kk] # 7/2/2021 do not include primary cols
             elif str(geo_dict["geo_type"]).lower() in ["iso2", "iso3"]:
                 # use the ISO2 or ISO3 column as country
                 staple_col_name = "country"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-                renamed_col_dict[staple_col_name] = [kk]
+                #renamed_col_dict[staple_col_name] = [kk] # 7/2/2021 do not include primary cols
                 # TODO: use ISO2/3 lookup dictionary to change ISO to country name.
 
         elif "qualifies" in geo_dict and geo_dict["qualifies"]:
@@ -912,7 +911,7 @@ def process(fp: str, mp: str, admin: str, output_file: str):
         norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
 
     # Testing
-
+    """
     #print('\n', norm.append(norm_str).head(50))
     #print('\n', norm.append(norm_str).tail(50))
 
@@ -920,7 +919,7 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     print('\n', norm.tail(50))
     print('\n', norm_str.head(50))
     print('\n', renamed_col_dict)
-
+    """
 
 
     return norm.append(norm_str), renamed_col_dict
@@ -1009,14 +1008,14 @@ def raster2df(
     return df
 
 # Testing
-
+"""
 mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
 fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
 process(fp, mp, geo, outf)
-"""
+
 mapper = json.loads(open(mp).read())
 mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 df = pd.read_csv(fp)
