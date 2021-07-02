@@ -30,19 +30,30 @@ if not sys.warnoptions:
 logger = logging.getLogger(__name__)
 
 def audit_renamed_col_dict(dct: dict) -> dict:
-    # Handle edge cases where a col could be renamed back to itself.
-    # example: no primary_geo, but country is present. Because it is a protected
-    # col name, it would be renamed country_non_primary. Later, it would be set
-    # as primary_geo country, and the pair added to renamed_col_dict again:
-    # {"['country']": 'country_non_primary', "['country_non_primary']": 'country' }
+    """
+    Description
+    -----------
+    Handle edge cases where a col could be renamed back to itself.
+    example: no primary_geo, but country is present. Because it is a protected
+    col name, it would be renamed country_non_primary. Later, it would be set
+    as primary_geo country, and the pair added to renamed_col_dict again:
+    {'country_non_primary' : ['country'], "country": ['country_non_primary'] }
 
+    Parameters
+    ----------
+    dct: dict
+        renamed_col_dict of key: new column name, value: list of old columns
+
+    Output
+    ------
+    dict:
+        The modified parameter dict.
+    """
     remove_these = set()
     for k, v in dct.items():
-        keystr = k.strip("'[]")
-        value_list_string = str([v])
-        if value_list_string in dct.keys() and keystr in dct.values():
-            remove_these.add(value_list_string)
-            remove_these.add(k)
+        if str(v) in dct.keys() and [k] in dct.values():
+            remove_these.add(v)
+            remove_these.add([k])
 
     for k in remove_these:
         dct.pop(k, None)
@@ -253,6 +264,33 @@ def generate_timestamp_format(date_mapper: dict) -> str:
     return str.format("{}/{}/{}", month, day, year)
 
 def handle_colname_collisions(df: pd.DataFrame, mapper: dict, protected_cols: list) -> (pd.DataFrame, dict, dict):
+    """
+    Description
+    -----------
+    Identify mapper columns that match protected column names. When found,
+    update the mapper and dataframe, and keep a dict of these changes
+    to return to the caller e.g. SpaceTag.
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        submitted data
+    mapper: dict
+        a dictionary for the schema mapping (JSON) for the dataframe.
+    protected_cols: list
+        protected column names i.e. timestamp, country, admin1, feature, etc.
+
+    Output
+    ------
+    pd.DataFame:
+        The modified dataframe.
+    dict:
+        The modified mapper.
+    dict:
+        key: new column name e.g. "day1month1year1" or "country_non_primary"
+        value: list of old column names e.g. ['day1','month1','year1'] or ['country']
+    """
+
     # Get names of geo fields that collide and are not primary_geo = True
     non_primary_geo_cols = [d["name"] for d in mapper["geo"] if d["name"] in protected_cols and ("primary_geo" not in d or d["primary_geo"] == False)]
 
@@ -273,12 +311,11 @@ def handle_colname_collisions(df: pd.DataFrame, mapper: dict, protected_cols: li
     # Append any collision columns with the following suffix.
     suffix = "_non_primary"
 
-    # Build output dictionary
-    output_dict = { str([col]) : col + suffix  for col in collision_list }
-
-    # Update df
+    # Build output dictionary and update df.
+    renamed_col_dict = {}
     for col in collision_list:
         df.rename(columns={col: col + suffix}, inplace=True)
+        renamed_col_dict[col + suffix] = [col]
 
     # Update mapper
     for k, vlist in mapper.items():
@@ -292,7 +329,7 @@ def handle_colname_collisions(df: pd.DataFrame, mapper: dict, protected_cols: li
                 # change any instances of this column name in an associated_columns dict
                 dct["associated_columns"] = {k: v.replace(v, v + suffix) if v in collision_list else v for k, v in dct["associated_columns"].items() }
 
-    return df, mapper, output_dict
+    return df, mapper, renamed_col_dict
 
 def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -473,8 +510,6 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         "lng",
     ]
 
-
-
     # Create a dictionary of list: colnames: new col name, and modify df and
     # mapper for any column name collisions.
     df, mapper, renamed_col_dict = handle_colname_collisions(df, mapper, col_order)
@@ -513,12 +548,12 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 df[kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
                 staple_col_name = "timestamp"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-                renamed_col_dict[ str([kk]) ] = staple_col_name
+                renamed_col_dict[ staple_col_name ] = [kk]
             elif date_dict["date_type"] == "epoch":
                 # rename epoch time column as 'timestamp'
                 staple_col_name = "timestamp"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-                renamed_col_dict[ str([kk]) ] = staple_col_name
+                renamed_col_dict[ staple_col_name ] = [kk]
             elif date_dict["date_type"] in ["day","month","year"]:
                 primary_date_group_mapper[kk] = date_dict
 
@@ -531,7 +566,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 # column_name meaning is not lost.
                 if not primary_time_cols and not "timestamp" in df.columns:
                     df.rename(columns={kk: "timestamp"}, inplace=True)
-                    renamed_col_dict[ str([kk]) ] = staple_col_name
+                    renamed_col_dict[ staple_col_name ] = [kk]
                 # All not primary_time, not associated_columns fields are pushed to features.
                 features.append(kk)
 
@@ -581,7 +616,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         df['timestamp'] = df["timestamp"].apply(lambda x: format_time(str(x), time_formatter, validate=False))
 
         # Let SpaceTag know those date columns were renamed to timestamp.
-        renamed_col_dict[ str(assoc_fields) ] = "timestamp"
+        renamed_col_dict[ "timestamp" ] = assoc_fields
 
     while other_date_group_mapper:
         # Various date columns have been associated by the user and are not primary_date.
@@ -618,7 +653,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
         df[new_column_name] = df[new_column_name].apply(lambda x: format_time(str(x), time_formatter, validate=False))
 
         # Let SpaceTag know those date columns were renamed to a new column.
-        renamed_col_dict[ str(assoc_fields) ] = new_column_name
+        renamed_col_dict[ new_column_name] = assoc_fields
 
         # timestamp is a protected column, so don't add to features.
         if new_column_name != "timestamp":
@@ -630,11 +665,11 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             if geo_dict["geo_type"] == "latitude":
                 staple_col_name = "lat"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-                renamed_col_dict[ str([kk]) ] = staple_col_name
+                renamed_col_dict[staple_col_name] = [kk]
             elif geo_dict["geo_type"] == "longitude":
                 staple_col_name = "lng"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-                renamed_col_dict[ str([kk]) ] = staple_col_name
+                renamed_col_dict[staple_col_name] = [kk]
             elif geo_dict["geo_type"] == "coordinates":
                 c_f = geo_dict["coord_format"]
                 coords = df[kk].values
@@ -651,7 +686,14 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
                 # force the country column to be named country
                 staple_col_name = "country"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
-                renamed_col_dict[ str([kk]) ] = staple_col_name
+                renamed_col_dict[staple_col_name] = [kk]
+            elif str(geo_dict["geo_type"]).lower() in ["iso2", "iso3"]:
+                # use the ISO2 or ISO3 column as country
+                staple_col_name = "country"
+                df.rename(columns={kk: staple_col_name}, inplace=True)
+                renamed_col_dict[staple_col_name] = [kk]
+                # TODO: use ISO2/3 lookup dictionary to change ISO to country name.
+
         elif "qualifies" in geo_dict and geo_dict["qualifies"]:
             # Note that any "qualifier" column that is not primary geo/date
             # will just be lopped on to the right as its own column. It'’'s
@@ -674,19 +716,19 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             if len(primary_geo_cols) == 0:
                 if geo_dict["geo_type"] == "country":
                     df["country"] = df[kk]
-                    renamed_col_dict[ str([kk]) ] = "country"
+                    renamed_col_dict["country"] = [kk]
                     continue
                 if geo_dict["geo_type"] == "state/territory":
                     df["admin1"] = df[kk]
-                    renamed_col_dict[ str([kk]) ] = "admin1"
+                    renamed_col_dict["admin1"] = [kk]
                     continue
                 if geo_dict["geo_type"] == "county/district":
                     df["admin2"] = df[kk]
-                    renamed_col_dict[ str([kk]) ] = "admin2"
+                    renamed_col_dict["admin2"] = [kk]
                     continue
                 if geo_dict["geo_type"] == "municipality/town":
                     df["admin3"] = df[kk]
-                    renamed_col_dict[ str([kk]) ] = "admin3"
+                    renamed_col_dict["admin3"] = [kk]
                     continue
             features.append(kk)
 
@@ -793,7 +835,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
             df_out[c] = None
 
     # Handle any renamed cols being renamed.
-    #renamed_col_dict = audit_renamed_col_dict(renamed_col_dict)
+    renamed_col_dict = audit_renamed_col_dict(renamed_col_dict)
 
     return df_out[col_order]#, renamed_col_dict
 
@@ -839,8 +881,16 @@ def process(fp: str, mp: str, admin: str, output_file: str):
 
     # Make mapper contain only keys for date, geo, and feature.
     mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
+
+    # Run normailizer.
     #norm, renamed_col_dict = normalizer(df, mapper, admin)
     norm = normalizer(df, mapper, admin)
+
+    # Normalizer will add NaN for missing values, e.g. when appending
+    # dataframes with different columns. GADM will return None when geocoding
+    # but not finding the entity (e.g. admin3 for United States).
+    # Replace None with NaN for consistency.
+    norm.fillna(value=np.nan, inplace=True)
 
     # Separate string values from others
     norm['type'] = norm[['value']].applymap(type)
@@ -849,7 +899,14 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     del(norm_str['type'])
     del(norm['type'])
 
+    # Write parquet files
+    norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
+    if len(norm_str) > 0:
+        norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
+
     # Testing
+    print('\n', norm.append(norm_str).head(50))
+    print('\n', norm.append(norm_str).tail(50))
     """
     print('\n', norm.head(50))
     print('\n', norm.tail(50))
@@ -857,9 +914,6 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     #print('\n', renamed_col_dict)
     """
 
-    norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
-    if len(norm_str) > 0:
-        norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
     return norm.append(norm_str) #, renamed_col_dict
 
 def raster2df(
@@ -946,7 +1000,7 @@ def raster2df(
     return df
 
 # Testing
-"""
+
 mp = 'examples/causemosify-tests/mixmasta_ready_annotations_qualifies.json'
 fp = 'examples/causemosify-tests/raw_data_qualifies.csv'
 geo = 'admin3'
@@ -954,7 +1008,7 @@ outf = 'examples/causemosify-tests/testing'
 
 process(fp, mp, geo, outf)
 
-
+"""
 mapper = json.loads(open(mp).read())
 mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 df = pd.read_csv(fp)
