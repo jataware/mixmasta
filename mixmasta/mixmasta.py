@@ -64,19 +64,30 @@ def audit_renamed_col_dict(dct: dict) -> dict:
 
     return dct
 
-def fix_qualified_col_dict(qualified_col_dict: dict, assoc_fields: list, new_column_name: str) -> dict:
+def build_date_qualifies_field(qualified_col_dict: dict, assoc_fields: list) -> str:
     """
-    # Handle edge case of each date field in assoc_fields qualifying
-    # the same column e.g. day/month/year are associated and qualify
-    # a field. In this case, the new_column_name
+    Description
+    -----------
+    Handle edge case of each date field in assoc_fields qualifying the same
+    column e.g. day/month/year are associated and qualify a field. In this
+    case, the new_column_name.
 
-    qualified_col_dict: {'pop': ['month_column', 'day_column', 'year_column']}
-    assoc_fields:       ['month_column', 'day_column', 'year_column']
-    new_column_name:    day_columnmonth_columnyear_column
+    if assoc_fields is found as a value in qualified_col_dict, return the key
+
+    Parameters
+    ----------
+    qualified_col_dict: dict
+        {'pop': ['month_column', 'day_column', 'year_column']}
+
+    assoc_fields: list
+        ['month_column', 'day_column', 'year_column']
 
     """
-    #print(qualified_col_dict, assoc_fields, new_column_name)
-    pass
+    for k, v in qualified_col_dict.items():
+        if v == assoc_fields:
+            return k
+
+    return None
 
 def format_time(t: str, time_format: str, validate: bool = True) -> int:
     """
@@ -100,7 +111,7 @@ def format_time(t: str, time_format: str, validate: bool = True) -> int:
     """
 
     try:
-        t_ = int(datetime.strptime(t, time_format).timestamp())
+        t_ = int(datetime.strptime(t, time_format).timestamp()) * 1000 # Want milliseonds
         return t_
     except Exception as e:
         if t.endswith(' 00:00:00'):
@@ -724,12 +735,15 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
 
         # timestamp is a protected column, so don't add to features.
         if new_column_name != "timestamp":
-            features.append(new_column_name)
-
             # Handle edge case of each date field in assoc_fields qualifying
             # the same column e.g. day/month/year are associated and qualify
             # a field. In this case, the new_column_name
-            #print(qualified_col_dict, assoc_fields, new_column_name)
+            qualified_col = build_date_qualifies_field(qualified_col_dict, assoc_fields)
+            if qualified_col is None:
+                features.append(new_column_name)
+            else:
+                qualified_col_dict[qualified_col] = [new_column_name]
+
 
     for geo_dict in mapper["geo"]:
         kk = geo_dict["name"]
@@ -1083,14 +1097,20 @@ def raster2df(
     return df
 
 # Testing
+"""
+# iso testing:
+#mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
+#fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
 
-mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
-fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
+# build a date qualifier
+mp = 'examples/causemosify-tests/build-a-date-qualifier.json'
+fp = 'examples/causemosify-tests/build-a-date-qualifier.csv'
+
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
 process(fp, mp, geo, outf)
-"""
+
 mapper = json.loads(open(mp).read())
 mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 df = pd.read_csv(fp)
