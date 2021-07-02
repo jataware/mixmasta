@@ -335,7 +335,8 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
     """
     Assumption
     ----------
-    Country was selected by drop-down on file submission.
+    Country was selected by drop-down on file submission, column "country"
+    is present in the data frame, and lng/lat is not being used for geocoding.
 
     Parameters
     ----------
@@ -347,13 +348,6 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
     Result
     ------
     A pandas.Dataframe produced by modifying the parameter df.
-
-
-    Examples
-    --------
-    Match geo names for a dataframe without columns named 'lat' and 'lon'
-
-    >>> df = match_geo_names(admin, df)
 
     """
     flag = speedups.available
@@ -389,8 +383,19 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
 
     # Filter GADM for countries in df.
     countries = df["country"].unique()
+
+    # Correct country names.
+    #gadm_country_list = gadm["country"].unique()
+    #unknowns = ~df.country.isin(gadm_country_list).country.tolist()
+    #for unk in unknowns:
+    #    match = fuzzywuzzy.process.extractOne(unk, gadm_country_list, scorer=fuzz.ratio)
+    #    if match != None:
+    #        df.loc[df.country == unk, 'country'] = match[0]
+
+    # Filter GADM dicitonary for only those countries (ie. speed up)
     gadm = gadm[gadm["country"].isin(countries)]
 
+    # Loop by country using gadm dict filtered for that country.
     for c in countries:
         # The following ignores admin1 / admin2 pairs; it only cares if those
         # values exist for the appropriate country.
@@ -454,7 +459,7 @@ def netcdf2df(netcdf: str) -> pd.DataFrame:
 
     return df
 
-def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
+def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dict):
     """
     Description
     -----------
@@ -837,7 +842,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> pd.DataFrame:
     # Handle any renamed cols being renamed.
     renamed_col_dict = audit_renamed_col_dict(renamed_col_dict)
 
-    return df_out[col_order]#, renamed_col_dict
+    return df_out[col_order], renamed_col_dict
 
 def process(fp: str, mp: str, admin: str, output_file: str):
     """
@@ -883,8 +888,8 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 
     # Run normailizer.
-    #norm, renamed_col_dict = normalizer(df, mapper, admin)
-    norm = normalizer(df, mapper, admin)
+    norm, renamed_col_dict = normalizer(df, mapper, admin)
+    #norm = normalizer(df, mapper, admin)
 
     # Normalizer will add NaN for missing values, e.g. when appending
     # dataframes with different columns. GADM will return None when geocoding
@@ -905,16 +910,18 @@ def process(fp: str, mp: str, admin: str, output_file: str):
         norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
 
     # Testing
+    """
     print('\n', norm.append(norm_str).head(50))
     print('\n', norm.append(norm_str).tail(50))
-    """
+
     print('\n', norm.head(50))
     print('\n', norm.tail(50))
     print('\n', norm_str.head(50))
-    #print('\n', renamed_col_dict)
+    print('\n', renamed_col_dict)
     """
 
-    return norm.append(norm_str) #, renamed_col_dict
+
+    return norm.append(norm_str), renamed_col_dict
 
 def raster2df(
     InRaster: str,
@@ -1000,15 +1007,14 @@ def raster2df(
     return df
 
 # Testing
-
-mp = 'examples/causemosify-tests/mixmasta_ready_annotations_qualifies.json'
-fp = 'examples/causemosify-tests/raw_data_qualifies.csv'
+"""
+mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
+fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
 process(fp, mp, geo, outf)
 
-"""
 mapper = json.loads(open(mp).read())
 mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 df = pd.read_csv(fp)
