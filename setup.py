@@ -47,6 +47,7 @@ setup(
     include_package_data=True,
     keywords="mixmasta",
     name="mixmasta",
+    package_data={'mixmasta' : ['data/*']},
     packages=find_packages(include=["mixmasta", "mixmasta.*"]),
     test_suite="tests",
     url="https://github.com/jataware/mixmasta",
