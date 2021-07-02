@@ -16,10 +16,12 @@ from osgeo import gdal, gdalconst
 from shapely import speedups
 from shapely.geometry import Point
 
+from pathlib import Path
+
 import fuzzywuzzy
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
-import timeit
+#import timeit
 #from .spacetag_schema import SpaceModel
 
 if not sys.warnoptions:
@@ -183,7 +185,7 @@ def generate_column_name(field_list: list) -> str:
 
     Returns
     -------
-    str new column name
+    str: new column name
 
     """
     return ''.join(sorted(field_list))
@@ -263,6 +265,46 @@ def generate_timestamp_format(date_mapper: dict) -> str:
             year = vv["time_format"]
 
     return str.format("{}/{}/{}", month, day, year)
+
+def get_iso_country_dict(iso_list: list) -> dict:
+    """
+    Description
+    -----------
+    iso2 or iso3 is used as primary_geo and therefore the country column.
+    Load the custom iso lookup table and return a dictionary of the iso codes
+    as keys and the country names as values. Assume all list items are the same
+    iso type.
+
+    Parameters
+    ----------
+    iso_list:
+        list of iso2 or iso3 codes
+
+    Returns
+    -------
+    dict:
+        key: iso code; value: country name
+
+    """
+    dct = {}
+    if iso_list:
+        path = Path(__file__).parent / "data/iso_lookup.csv"
+        iso_df = pd.read_csv(path)
+
+        if iso_df.empty:
+            return dct
+
+        if len(iso_list[0]) == 2:
+            for iso in iso_list:
+                if iso in iso_df["iso2"].values:
+                    dct[iso] = iso_df.loc[iso_df["iso2"] == iso]["country"].item()
+        else:
+            for iso in iso_list:
+                if iso in iso_df["iso3"].values:
+                    dct[iso] = iso_df.loc[iso_df["iso3"] == iso]["country"].item()
+
+
+    return dct
 
 def handle_colname_collisions(df: pd.DataFrame, mapper: dict, protected_cols: list) -> (pd.DataFrame, dict, dict):
     """
@@ -386,12 +428,12 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
     countries = df["country"].unique()
 
     # Correct country names.
-    #gadm_country_list = gadm["country"].unique()
-    #unknowns = ~df.country.isin(gadm_country_list).country.tolist()
-    #for unk in unknowns:
-    #    match = fuzzywuzzy.process.extractOne(unk, gadm_country_list, scorer=fuzz.ratio)
-    #    if match != None:
-    #        df.loc[df.country == unk, 'country'] = match[0]
+    gadm_country_list = gadm["country"].unique()
+    unknowns = df[~df.country.isin(gadm_country_list)].country.tolist()
+    for unk in unknowns:
+        match = fuzzywuzzy.process.extractOne(unk, gadm_country_list, scorer=fuzz.ratio)
+        if match != None:
+            df.loc[df.country == unk, 'country'] = match[0]
 
     # Filter GADM dicitonary for only those countries (ie. speed up)
     gadm = gadm[gadm["country"].isin(countries)]
@@ -695,10 +737,16 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
                 #renamed_col_dict[staple_col_name] = [kk] # 7/2/2021 do not include primary cols
             elif str(geo_dict["geo_type"]).lower() in ["iso2", "iso3"]:
                 # use the ISO2 or ISO3 column as country
+
+                # use ISO2/3 lookup dictionary to change ISO to country name.
+                iso_list = df[kk].unique().tolist()
+                dct = get_iso_country_dict(iso_list)
+                df[kk] = df[kk].apply(lambda x: dct[x] if x in dct else x)
+
+                # now rename that column as "country"
                 staple_col_name = "country"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
                 #renamed_col_dict[staple_col_name] = [kk] # 7/2/2021 do not include primary cols
-                # TODO: use ISO2/3 lookup dictionary to change ISO to country name.
 
         elif "qualifies" in geo_dict and geo_dict["qualifies"]:
             # Note that any "qualifier" column that is not primary geo/date
@@ -764,9 +812,13 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
     # perform geocoding if lat/lng are present
     if "lat" in df and "lng" in df:
         df = geocode(admin, df, x="lng", y="lat")
-    elif "country" in df:
+    #elif "country" in df:
+    elif "country" in primary_geo_cols or ("country" in df and not primary_geo_cols):
         # Correct any misspellings etc. in state and admin areas when not
-        # geocoding lat and lng above.
+        # geocoding lat and lng above, and country is the primary_geo.
+        # This don't match names if iso2/iso3 are primary, and when country
+        # admin1-3 are moved to features. Exception is when country is present,
+        # but nothing is marked as primary.
         df = match_geo_names(admin, df)
 
     df_geo_cols = [i for i in df.columns if 'mixmasta_geocoded' in i]
@@ -911,16 +963,15 @@ def process(fp: str, mp: str, admin: str, output_file: str):
         norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
 
     # Testing
-    """
+
     #print('\n', norm.append(norm_str).head(50))
     #print('\n', norm.append(norm_str).tail(50))
-
+    """
     print('\n', norm.head(50))
     print('\n', norm.tail(50))
     print('\n', norm_str.head(50))
     print('\n', renamed_col_dict)
     """
-
 
     return norm.append(norm_str), renamed_col_dict
 
