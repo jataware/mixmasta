@@ -250,11 +250,11 @@ def generate_timestamp(series: pd.Series, date_mapper: dict, column_name: str) -
     year = 70
 
     for kk, vv in date_mapper.items():
-        if vv["date_type"] == "day":
+        if vv and vv["date_type"] == "day":
             day = series[kk]
-        elif vv["date_type"] == "month":
+        elif vv and vv["date_type"] == "month":
             month = series[kk]
-        elif vv["date_type"] == "year":
+        elif vv and vv["date_type"] == "year":
             year = str(series[kk])
 
     timestamp =  '/'.join([str(month),str(day),str(year)])
@@ -588,6 +588,9 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
         "lng",
     ]
 
+    # List of date_types that be used to build a date.
+    MONTH_DAY_YEAR  = ["day","month","year"]
+
     # Create a dictionary of list: colnames: new col name, and modify df and
     # mapper for any column name collisions.
     df, mapper, renamed_col_dict = handle_colname_collisions(df, mapper, col_order)
@@ -648,10 +651,11 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
                 # All not primary_time, not associated_columns fields are pushed to features.
                 features.append(kk)
 
-            elif date_dict["date_type"] in ["day","month","year"] and 'associated_columns' in date_dict and date_dict["associated_columns"]:
+            elif date_dict["date_type"] in MONTH_DAY_YEAR and 'associated_columns' in date_dict and date_dict["associated_columns"]:
                 # Various date columns have been associated by the user and are not primary_date.
                 # convert them to epoch then store them as a feature
                 # (instead of storing them as separate uncombined features).
+                # handle this dict after iterating all date fields
                 other_date_group_mapper[kk] = date_dict
 
             else:
@@ -699,12 +703,31 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
     while other_date_group_mapper:
         # Various date columns have been associated by the user and are not primary_date.
         # Convert to epoch time and store as a feature, do not store these separately in features.
+        # Exception is the group is only two of day, month, year: leave as date.
         # Control for possibility of more than one set of assciated_columns.
+
+        # Pop the first item in the mapper and begin building that date set.
         date_field_tuple = other_date_group_mapper.popitem()
+
+        # Build a list of column names associated with the the popped date field.
         assoc_fields = [k[1] for k in date_field_tuple[1]['associated_columns'].items()]
-        assoc_columns = { f : other_date_group_mapper.pop(f, None) for f in assoc_fields }
-        assoc_columns[date_field_tuple[0]] = date_field_tuple[1]
+
+        # Pop those mapper objects into a dict based on the column name keys in
+        # assocfields list.
+        assoc_columns_dict = { f : other_date_group_mapper.pop(f) for f in assoc_fields if f in other_date_group_mapper }
+
+        # Add the first popped tuple into the assoc_columns dict where the key is the
+        # first part of the tuple; the value is the 2nd part.
+        assoc_columns_dict[date_field_tuple[0]] = date_field_tuple[1]
+
+        # Add the first popped tuple column name to the list of associated fields.
         assoc_fields.append(date_field_tuple[0])
+
+        # TODO: If day and year are associated to each other and month, but
+        # month is not associated to those fields, then at this point assoc_fields
+        # will be the three values, and assoc_columns will contain only day and
+        # year. This will error out below. It is assumed that SpaceTag will
+        # control for this instance.
 
         # If there is no primary_time column for timestamp, which would have
         # been created above with primary_date_group_mapper, or farther above
@@ -722,13 +745,16 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
         date_df = df[ assoc_fields ]
 
         # Now generate the timestamp from date_df and add the new_column to df.
-        new_series = date_df.apply(generate_timestamp, date_mapper=assoc_columns, column_name=new_column_name, axis=1)
+        new_series = date_df.apply(generate_timestamp, date_mapper=assoc_columns_dict, column_name=new_column_name, axis=1)
         df = df.join(new_series)
 
         # Determine the correct time format for the new date column, and
-        # convert to epoch time.
-        time_formatter = generate_timestamp_format(assoc_columns)
-        df[new_column_name] = df[new_column_name].apply(lambda x: format_time(str(x), time_formatter, validate=False))
+        # convert to epoch time only if all three date components (day, month,
+        # year) are present; otherwise leave as a date string.
+        date_types = [v["date_type"] for k,v in assoc_columns_dict.items()]
+        if len(frozenset(date_types).intersection(MONTH_DAY_YEAR)) == 3:
+            time_formatter = generate_timestamp_format(assoc_columns_dict)
+            df[new_column_name] = df[new_column_name].apply(lambda x: format_time(str(x), time_formatter, validate=False))
 
         # Let SpaceTag know those date columns were renamed to a new column.
         renamed_col_dict[ new_column_name] = assoc_fields
@@ -1005,10 +1031,10 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     #print('\n', norm.append(norm_str).head(50))
     #print('\n', norm.append(norm_str).tail(50))
     """
-    print('\n', norm.head(50))
+    print('\n', norm.head(100))
     print('\n', norm.tail(50))
     print('\n', norm_str.head(50))
-    print('\n', renamed_col_dict)
+    print('\nrenamed column dictionary\n', renamed_col_dict)
     """
 
     return norm.append(norm_str), renamed_col_dict
