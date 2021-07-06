@@ -1,0 +1,68 @@
+{
+	"geo": [
+		{
+			"name": "iso3",
+			"type": "geo",
+			"geo_type": "iso3",
+			"primary_geo": true
+        },
+		{
+			"name": "country",
+			"type": "geo",
+			"geo_type": "country",
+			"primary_geo": false
+        },
+		{
+			"name": "admin1",
+			"type": "geo",
+			"geo_type": "state/territory",
+			"primary_geo": false
+        },
+		{
+			"name": "admin2",
+			"type": "geo",
+			"geo_type": "county/district",
+			"primary_geo": false
+        },
+		{
+			"name": "admin3",
+			"type": "geo",
+			"geo_type": "municipality/town",
+			"primary_geo": false
+        }  
+	],
+	"date": [
+		{
+			"name": "event_date",
+			"display_name": "Event Date",
+			"description": "pri time",
+			"type": "date",
+			"date_type": "date",
+			"time_format": "%Y-%m-%d",
+			"primary_date": true
+		},
+		{
+			"name": "timestamp",
+			"display_name": "Timestamp",
+			"description": "pri feature",
+			"type": "date",
+			"date_type": "epoch"
+		}
+	],
+	"feature": [
+		{
+			"name": "fatalities",
+			"display_name": "Fatalities",
+			"description": "this is the feature",
+			"type": "feature",
+			"feature_type": "int",
+			"units": "people",
+			"units_description": "fatalities",
+			"qualifies": ["timestamp"]
+		}
+	],
+	"meta": {
+		"ftype": "excel",
+		"sheet": "ACLED_Actor-Based_1997-2021_con"
+	}
+}

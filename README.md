@@ -4,7 +4,7 @@ A library for common scientific model transforms. This library enables fast and 
 
 * Converting a `geotiff` to a `csv`
 * Converting a `NetCDF` to a `csv`
-* Geocoding `csv` data that contains latitude and longitude
+* Geocoding `csv`, `xls`, and `xlsx` data that contains latitude and longitude
 
 
 ## Setup
@@ -58,14 +58,14 @@ from mixmasta import mixmasta as mix
 df = mix.raster2df('chirps-v2.0.2021.01.3.tif', feature_name='rainfall', band=1)
 
 # next, we can geocode the dataframe to the admin-level desired (`admin2` or `admin3`)
-# by specifying the names of the x and y columns 
+# by specifying the names of the x and y columns
 # in this case, we will geocode to admin2 where x,y are are 'longitude' and 'latitude', respectively.
 df_g = mix.geocode("admin2", df, x='longitude', y='latitude')
 ```
 
 ## Running with CLI
 
-After cloning the repository and changing to the `mixmasta` directory, you can run mixmasta via the command line. 
+After cloning the repository and changing to the `mixmasta` directory, you can run mixmasta via the command line.
 
 Set-up:
 
@@ -111,6 +111,11 @@ This will produce a file called `causemosified_example.parquet.gzip` which can b
 ```
 pd.read_parquet('causemosified_example.parquet.gzip')
 ```
+
+## Other Documents
+- Docker Instructions: `docs/docker.md`
+- Geo Entity Resolution Description: `docs/geo-tentity-resolution.md`
+- Package Testing in SpaceTag Env: `docs/spacetag-test.md`
 
 ## Credits
 
