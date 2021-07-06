@@ -1,0 +1,102 @@
+{
+    "geo":
+    [
+        {
+            "name": "iso2",
+            "display_name": "iso2",
+            "description": "pri geo",
+            "type": "geo",
+            "geo_type": "iso2",
+            "primary_geo": true
+        }
+    ],
+    "date":
+    [
+        {
+            "name": "month_column",
+            "display_name": "month_column",
+            "description": "qual pop",
+            "type": "date",
+            "date_type": "month",
+            "dateassociation": true,
+            "time_format": "%m",
+            "associated_columns":
+            {
+                "Year": "year_column",
+				"Day": "day_column"
+            },
+            "qualifies":
+            [
+
+            ],
+            "primary_date": false
+        },
+        {
+            "name": "day_column",
+            "display_name": "day_column",
+            "description": "qual pop",
+            "type": "date",
+            "date_type": "day",
+            "dateassociation": true,
+            "time_format": "%d",
+            "associated_columns":
+            {
+                 "Month": "month_column",
+				 "Year": "year_column"
+            },
+            "qualifies":
+            [
+
+            ],
+            "primary_date": false
+        },
+        {
+            "name": "year_column",
+            "display_name": "Year Column",
+            "description": "qual pop",
+            "type": "date",
+            "date_type": "year",
+            "dateassociation": true,
+            "qualifies":
+            [
+
+            ],
+            "associated_columns":
+            {
+                "Month": "month_column",
+				"Day": "day_column"
+
+            },
+            "time_format": "%Y"
+        }
+    ],
+    "feature":
+    [
+        {
+            "name": "pop",
+            "display_name": "Pop",
+            "description": "feat",
+            "type": "feature",
+            "feature_type": "int",
+            "units": "asdcasd",
+            "units_description": "asdcas"
+        },
+        {
+            "name": "health_ind",
+            "display_name": "Health Ind",
+            "description": "qual feat",
+            "type": "feature",
+            "feature_type": "int",
+            "units": "asdc",
+            "units_description": "asdc",
+            "qualifies":
+            [
+
+            ]
+        }
+    ],
+    "meta":
+    {
+        "ftype": "csv"
+    }
+}

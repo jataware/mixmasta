@@ -311,14 +311,20 @@ def get_iso_country_dict(iso_list: list) -> dict:
     dict:
         key: iso code; value: country name
     """
+
     dct = {}
     if iso_list:
         iso_df = pd.DataFrame
         try:
             # The necessary code to load from pkg doesn't currently work in VS
             # Code Debug, so wrap in try/except.
-            iso_df = pd.read_csv(pkg_resources.resource_stream(__name__, 'data/iso_lookup.csv'))
+            #iso_df = pd.read_csv(pkg_resources.resource_stream(__name__, 'data/iso_lookup.csv'))
+            with pkg_resources.resource_stream(__name__, 'data/iso_lookup.csv') as f:
+                iso_df = pd.read_csv(f)
+            #path = Path(__file__).parent / "data/iso_lookup.csv"
+            #iso_df = pd.read_csv(path)
         except:
+            # Local VS Code load.
             path = Path(__file__).parent / "data/iso_lookup.csv"
             iso_df = pd.read_csv(path)
 
@@ -973,7 +979,9 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     """
 
     # Read JSON schema to be mapper.
-    mapper = json.loads(open(mp).read())
+    mapper = dict
+    with open(mp) as f:
+        mapper = json.loads(f.read())
 
     # Validate JSON mapper schema against SpaceTag schema.py model.
     #model = SpaceModel(geo=mapper['geo'], date=mapper['date'], feature=mapper['feature'], meta=mapper['meta'])
@@ -1030,12 +1038,6 @@ def process(fp: str, mp: str, admin: str, output_file: str):
 
     #print('\n', norm.append(norm_str).head(50))
     #print('\n', norm.append(norm_str).tail(50))
-    """
-    print('\n', norm.head(100))
-    print('\n', norm.tail(50))
-    print('\n', norm_str.head(50))
-    print('\nrenamed column dictionary\n', renamed_col_dict)
-    """
 
     return norm.append(norm_str), renamed_col_dict
 
@@ -1123,19 +1125,26 @@ def raster2df(
     return df
 
 # Testing
-"""
+
 # iso testing:
 #mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
 #fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
 
 # build a date qualifier
+"""
 mp = 'examples/causemosify-tests/build-a-date-qualifier.json'
 fp = 'examples/causemosify-tests/build-a-date-qualifier.csv'
 
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
-process(fp, mp, geo, outf)
+df, dct = process(fp, mp, geo, outf)
+
+print('\n', df.head(100))
+print('\n', df.tail(50))
+print('\nrenamed column dictionary\n', dct)
+
+df.to_csv("output.csv")
 
 mapper = json.loads(open(mp).read())
 mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
