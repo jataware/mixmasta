@@ -19,6 +19,7 @@ class TestMixmaster(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures, if any."""
         #warnings.simplefilter('ignore', category=ResourceWarning)
+        pass
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
