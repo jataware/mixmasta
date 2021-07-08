@@ -7,6 +7,7 @@
 - [Convert geotiff to csv](#convert-geotiff-to-csv)
 - [Convert geotiff to *Geocoded* csv](#convert-geotiff-to-geocoded-csv)
 - [Convert a csv file to *Geocoded* csv](#convert-a-csv-file-to-geocoded-csv)
+- [Causemosify a file](#causemosify-a-file)
 - [Available CLI Parameters](#available-cli-parameters)
 
 ### Set-Up
@@ -95,6 +96,8 @@ docker run -v $PWD:/tmp \
 ```
 
 ### Causemosify a file
+
+This is a special case where Mixmasta is used to make a CauseMos compliant file. It requires a mapper file which contains instructions for how to perform this transformation. Note that the `input_file` can contain the `*` wildcard character. This is designed to support models which may produce non-deterministic filenames for their outputs. For example, if a model produces an output that appends an epoch timestamp to the filename (e.g. `sample_output_1625711342.csv`) this is problematic and should be abstracted to `sample_output_*.csv` by the Dojo system. This is handled by the `causemosify` function in `cli.py`.
 
 ```
 docker run -v $PWD:/tmp \
