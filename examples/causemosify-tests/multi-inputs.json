@@ -1,0 +1,12 @@
+[
+   {
+      "input_file":"tmp/build-a-date-qualifier_*.csv",
+      "mapper":"tmp/build-a-date-qualifier.json",
+      "output_file":"tmp/output_1"
+   },
+   {
+      "input_file":"tmp/raw_excel_timestampfeature.xlsx",
+      "mapper":"tmp/mixmasta_ready_annotations_timestampfeature.json",
+      "output_file":"tmp/output_2"
+   }
+]
