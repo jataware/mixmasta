@@ -9,22 +9,14 @@ from .download import download_and_clean
 from .mixmasta import geocode, netcdf2df, process, raster2df
 
 from glob import glob
-
+import json
 
 @click.group()
 def cli():
     pass
 
 
-@cli.command()
-@click.option("--input_file", type=str, default=None)
-@click.option("--mapper", type=str, default=None)
-@click.option("--geo", type=str, default=None)
-@click.option("--output_file", type=str, default="mixmasta_output")
-def causemosify(input_file, mapper, geo, output_file):
-    """Processor for generating CauseMos compliant datasets."""
-    click.echo("Causemosifying data...")
-
+def glob_input_file(input_file: str) -> str:
     # Enable wild card in file path
     if "*" in input_file:
         try:
@@ -37,9 +29,39 @@ def causemosify(input_file, mapper, geo, output_file):
                 f'Unable to use wildcard character "*" to identify file; assuming {input_file} is actual file path.'
             )
             input_file = input_file
+    return input_file
+
+@cli.command()
+@click.option("--input_file", type=str, default=None)
+@click.option("--mapper", type=str, default=None)
+@click.option("--geo", type=str, default=None)
+@click.option("--output_file", type=str, default="mixmasta_output")
+def causemosify(input_file, mapper, geo, output_file):
+    """Processor for generating CauseMos compliant datasets."""
+    click.echo("Causemosifying data...")
+
+    input_file =  glob_input_file(input_file)
 
     return process(input_file, mapper, geo, output_file)
 
+
+@cli.command()
+@click.option("--inputs", type=str, default=None)
+@click.option("--geo", type=str, default=None)
+def causemosify_multi(inputs, geo):
+    """Process multiple input files to generate CauseMos compliant datasets."""
+
+    with open(inputs) as f:
+        input_array = json.load(f)
+
+    output = list()
+    for item in input_array:
+      input_file =  glob_input_file(item["input_file"])
+      mapper = item["mapper"]
+      output_file = item["output_file"]
+      output.append(process(input_file, mapper, geo, output_file))
+
+    return output
 
 @cli.command()
 @click.option("--xform", type=str, default=None)
