@@ -22,7 +22,7 @@ import pkg_resources
 import fuzzywuzzy
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
-#import timeit
+import timeit
 #from .spacetag_schema import SpaceModel
 
 if not sys.warnoptions:
@@ -999,12 +999,15 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True)
             d = None
         else:
             d = transform["date"]
+
         df = raster2df(
-            fp,
-            transform["feature_name"],
-            int(transform["band"]),
-            int(transform["null_val"]),
-            d,
+            InRaster = fp,
+            feature_name = transform["feature_name"],
+            band = int(transform["band"]),
+            nodataval = int(transform["null_val"]),
+            date = d,
+            band_name = transform["band_name"],
+            bands = transform["bands"]
         )
     elif ftype == 'excel':
         df = pd.read_excel(fp, transform['sheet'])
@@ -1051,9 +1054,11 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True)
 def raster2df(
     InRaster: str,
     feature_name: str = "feature",
-    band: int = 1,
+    band: int = 0,
     nodataval: int = -9999,
     date: str = None,
+    band_name: str = "feature2",
+    bands: dict = None
 ) -> pd.DataFrame:
     """
     Description
@@ -1081,54 +1086,92 @@ def raster2df(
 
     """
 
+    #start_time = timeit.default_timer()
+
     # open the raster and get some properties
     ds = gdal.OpenShared(InRaster, gdalconst.GA_ReadOnly)
     GeoTrans = ds.GetGeoTransform()
     ColRange = range(ds.RasterXSize)
     RowRange = range(ds.RasterYSize)
-    rBand = ds.GetRasterBand(band)  # first band
-    nData = rBand.GetNoDataValue()
-    if nData == None:
-        logging.info(f"No nodataval found, setting to {nodataval}")
-        nData = np.float32(nodataval)  # set it to something if not set
+
+    if band == 0 and bands:
+        # TODO Will someone import a raster but not use all bands?
+        #assert(len(bands) == ds.RasterCount)
+        pass
+
+    df = pd.DataFrame()
+
+    if bands == None:
+        columns = ["longitude", "latitude", feature_name]
     else:
-        logging.info(f"Nodataval is: {nData}")
+        columns=["longitude", "latitude", feature_name, band_name]
 
-    # specify the center offset (takes the point in middle of pixel)
-    HalfX = GeoTrans[1] / 2
-    HalfY = GeoTrans[5] / 2
+    for x in range(1, ds.RasterCount+1):
+        # If band has a value, then limit import to single band.
+        if band > 0 and band != x:
+            continue
 
-    # Check that NoDataValue is of the same type as the raster data
-    RowData = rBand.ReadAsArray(0, 0, ds.RasterXSize, 1)[0]
-    if type(nData) != type(RowData[0]):
-        logging.warning(
-            f"NoData type mismatch: NoDataValue is type {type(nData)} and raster data is type {type(RowData[0])}"
-        )
+        band_value = bands[str(x)]
+        rBand = ds.GetRasterBand(x)  # (band) # first band
+        nData = rBand.GetNoDataValue()
+        if nData == None:
+            logging.info(f"No nodataval found, setting to {nodataval}")
+            nData = np.float32(nodataval)  # set it to something if not set
+        else:
+            logging.info(f"Nodataval is: {nData}")
 
-    points = []
-    for ThisRow in RowRange:
-        RowData = rBand.ReadAsArray(0, ThisRow, ds.RasterXSize, 1)[0]
-        for ThisCol in ColRange:
-            # need to exclude NaN values since there is no nodataval
-            if (RowData[ThisCol] != nData) and not (np.isnan(RowData[ThisCol])):
+        # specify the center offset (takes the point in middle of pixel)
+        HalfX = GeoTrans[1] / 2
+        HalfY = GeoTrans[5] / 2
 
-                # TODO: implement filters on valid pixels
-                # for example, the below would ensure pixel values are between -100 and 100
-                # if (RowData[ThisCol] <= 100) and (RowData[ThisCol] >= -100):
+        # Check that NoDataValue is of the same type as the raster data
+        RowData = rBand.ReadAsArray(0, 0, ds.RasterXSize, 1)[0]
+        if type(nData) != type(RowData[0]):
+            # Should nData be set to type(RowData[0]) here?
+            logging.warning(
+                f"NoData type mismatch: NoDataValue is type {type(nData)} and raster data is type {type(RowData[0])}"
+            )
 
-                X = GeoTrans[0] + (ThisCol * GeoTrans[1])
-                Y = GeoTrans[3] + (
-                    ThisRow * GeoTrans[5]
-                )  # Y is negative so it's a minus
-                # this gives the upper left of the cell, offset by half a cell to get centre
-                X += HalfX
-                Y += HalfY
+        points = []
+        for ThisRow in RowRange:
+            RowData = rBand.ReadAsArray(0, ThisRow, ds.RasterXSize, 1)[0]
+            for ThisCol in ColRange:
+                # need to exclude NaN values since there is no nodataval
+                if (RowData[ThisCol] != nData) and not (np.isnan(RowData[ThisCol])):
 
-                points.append([X, Y, RowData[ThisCol]])
+                    # TODO: implement filters on valid pixels
+                    # for example, the below would ensure pixel values are between -100 and 100
+                    # if (RowData[ThisCol] <= 100) and (RowData[ThisCol] >= -100):
 
-    df = pd.DataFrame(points, columns=["longitude", "latitude", feature_name])
+                    X = GeoTrans[0] + (ThisCol * GeoTrans[1])
+                    Y = GeoTrans[3] + (
+                        ThisRow * GeoTrans[5]
+                    )  # Y is negative so it's a minus
+                    # this gives the upper left of the cell, offset by half a cell to get centre
+                    X += HalfX
+                    Y += HalfY
+
+                    if bands == None:
+                        points.append([X, Y, RowData[ThisCol]])
+                    else:
+                        points.append([X, Y, RowData[ThisCol], band_value])
+
+        new_df = pd.DataFrame(points, columns=columns)
+
+        if df.empty:
+            df = new_df
+        else:
+            #df = df.merge(new_df, left_on=["longitude", "latitude"], right_on=["longitude", "latitude"])
+            df = df.append(new_df)
+
     if date:
         df["date"] = date
+
+    df.sort_values(by=columns, inplace=True)
+
+    #print('raster2df time', timeit.default_timer() - start_time)
+    #print(df.head(50))
+    #df.to_csv("examples/causemosify-tests/output.csv")
     return df
 
 # Testing
@@ -1136,7 +1179,6 @@ def raster2df(
 # iso testing:
 #mp = 'examples/causemosify-tests/mixmasta_ready_annotations_timestampfeature.json'
 #fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
-
 # build a date qualifier
 
 #mp = 'examples/causemosify-tests/build-a-date-qualifier.json'
@@ -1153,17 +1195,15 @@ df, dct = process(
     geo, outf)
 
 print('\n', df.head(100))
-print('\n', df.tail(50))
+print('\n', df.tail(100))
+print('\n', df.shape)
 print('\nrenamed column dictionary\n', dct)
 
-
-df.to_csv("output.csv")
-
-mapper = json.loads(open(mp).read())
-mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
-df = pd.read_csv(fp)
-norm, changed_cols = normalizer(df, mapper, geo)
-print('\n', norm.head(50))
-print('\n', norm.tail(50))
-
 """
+
+#mapper = json.loads(open(mp).read())
+#mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
+#df = pd.read_csv(fp)
+#norm, changed_cols = normalizer(df, mapper, geo)
+#print('\n', norm.head(50))
+#print('\n', norm.tail(50))
