@@ -56,13 +56,26 @@ root@7b71fc24e8d4:~# python3
 ```
 Paste the following into the interpretor:
 ```
-from mixmasta import mixmasta as mixmasta
+from mixmasta import mixmasta as mix
 mp = 'mixmasta_ready_annotations_timestampfeature.json'
 fp = 'raw_excel_timestampfeature.xlsx'
 geo = 'admin3'
 outf = 'testing'
-df, dct = process(fp, mp, geo, outf)
+df, dct = mix.process(fp, mp, geo, outf)
 dct
 df.head(50)
 ```
 Success confirms MixMasta is installed. Examine the dataframe output to confirm it is correct.
+
+Mixmata can also be run from the CLI:
+```
+root@20abb83059d3:~# mixmasta causemosify --input_file=/root/raw_excel.xlsx --mapper=/root/mapper.json --geo=admin3
+```
+
+The following commands in the Python interpretor will examine the output parquet file:
+```
+import pandas as pd
+df2 = pd.read_parquet("mixmasta_output.parquet.gzip")
+df2.tail(50)
+
+```
