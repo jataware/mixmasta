@@ -923,7 +923,11 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
             if feat in qualified_col_dict:
                 # dict value is a list, so extend.
                 using_cols.extend(qualified_col_dict[feat])
-                col_order.extend(qualified_col_dict[feat])
+
+                # add a qualifying column name only if not in col_order already
+                for c in qualified_col_dict[feat]:
+                    if c not in col_order:
+                        col_order.append(c)
 
             join_overlap = False
             try:
@@ -1131,18 +1135,22 @@ def raster2df(
 #fp = 'examples/causemosify-tests/raw_excel_timestampfeature.xlsx'
 
 # build a date qualifier
-"""
-mp = 'examples/causemosify-tests/build-a-date-qualifier.json'
-fp = 'examples/causemosify-tests/build-a-date-qualifier.csv'
 
+#mp = 'examples/causemosify-tests/build-a-date-qualifier.json'
+#fp = 'examples/causemosify-tests/build-a-date-qualifier.csv'
+"""
 geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
-df, dct = process(fp, mp, geo, outf)
+df, dct = process(
+    'examples/causemosify-tests/raw_excel.xlsx',
+    'examples/causemosify-tests/sent_to_mixmasta.json',
+    geo, outf)
 
 print('\n', df.head(100))
 print('\n', df.tail(50))
 print('\nrenamed column dictionary\n', dct)
+
 
 df.to_csv("output.csv")
 

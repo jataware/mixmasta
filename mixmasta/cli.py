@@ -8,6 +8,8 @@ import pandas as pd
 from .download import download_and_clean
 from .mixmasta import geocode, netcdf2df, process, raster2df
 
+from glob import glob
+
 
 @click.group()
 def cli():
@@ -22,6 +24,20 @@ def cli():
 def causemosify(input_file, mapper, geo, output_file):
     """Processor for generating CauseMos compliant datasets."""
     click.echo("Causemosifying data...")
+
+    # Enable wild card in file path
+    if "*" in input_file:
+        try:
+            input_file = glob(input_file)[0]
+            click.echo(
+                f'Wildcard character "*" detected; input file resolved to {input_file}'
+            )
+        except:
+            click.echo(
+                f'Unable to use wildcard character "*" to identify file; assuming {input_file} is actual file path.'
+            )
+            input_file = input_file
+
     return process(input_file, mapper, geo, output_file)
 
 
