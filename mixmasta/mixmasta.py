@@ -971,7 +971,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
 
     return df_out[col_order], renamed_col_dict
 
-def process(fp: str, mp: str, admin: str, output_file: str):
+def process(fp: str, mp: str, admin: str, output_file: str, write_output = True):
     """
     Parameters
     ----------
@@ -1026,24 +1026,27 @@ def process(fp: str, mp: str, admin: str, output_file: str):
     # Replace None with NaN for consistency.
     norm.fillna(value=np.nan, inplace=True)
 
-    # Separate string values from others
-    norm['type'] = norm[['value']].applymap(type)
-    norm_str = norm[norm['type']==str]
-    norm = norm[norm['type']!=str]
-    del(norm_str['type'])
-    del(norm['type'])
+    if write_output:
+        # Separate string values from others
+        norm['type'] = norm[['value']].applymap(type)
+        norm_str = norm[norm['type']==str]
+        norm = norm[norm['type']!=str]
+        del(norm_str['type'])
+        del(norm['type'])
 
-    # Write parquet files
-    norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
-    if len(norm_str) > 0:
-        norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
+        # Testing
+        #print('\n', norm.append(norm_str).head(50))
+        #print('\n', norm.append(norm_str).tail(50))
 
-    # Testing
+        # Write parquet files
+        norm.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
+        if len(norm_str) > 0:
+            norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
 
-    #print('\n', norm.append(norm_str).head(50))
-    #print('\n', norm.append(norm_str).tail(50))
+        return norm.append(norm_str), renamed_col_dict
+    else:
+        return norm, renamed_col_dict
 
-    return norm.append(norm_str), renamed_col_dict
 
 def raster2df(
     InRaster: str,
@@ -1143,6 +1146,8 @@ geo = 'admin3'
 outf = 'examples/causemosify-tests/testing'
 
 df, dct = process(
+    "examples/causemosify-tests/raw_excel.xlsx",
+    "examples/causemosify-tests/sent_to_mixmasta.json",
     'examples/causemosify-tests/raw_excel.xlsx',
     'examples/causemosify-tests/sent_to_mixmasta.json',
     geo, outf)

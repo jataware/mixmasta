@@ -9,22 +9,14 @@ from .download import download_and_clean
 from .mixmasta import geocode, netcdf2df, process, raster2df
 
 from glob import glob
-
+import json
 
 @click.group()
 def cli():
     pass
 
 
-@cli.command()
-@click.option("--input_file", type=str, default=None)
-@click.option("--mapper", type=str, default=None)
-@click.option("--geo", type=str, default=None)
-@click.option("--output_file", type=str, default="mixmasta_output")
-def causemosify(input_file, mapper, geo, output_file):
-    """Processor for generating CauseMos compliant datasets."""
-    click.echo("Causemosifying data...")
-
+def glob_input_file(input_file: str) -> str:
     # Enable wild card in file path
     if "*" in input_file:
         try:
@@ -37,9 +29,62 @@ def causemosify(input_file, mapper, geo, output_file):
                 f'Unable to use wildcard character "*" to identify file; assuming {input_file} is actual file path.'
             )
             input_file = input_file
+    return input_file
+
+@cli.command()
+@click.option("--input_file", type=str, default=None)
+@click.option("--mapper", type=str, default=None)
+@click.option("--geo", type=str, default=None)
+@click.option("--output_file", type=str, default="mixmasta_output")
+def causemosify(input_file, mapper, geo, output_file):
+    """Processor for generating CauseMos compliant datasets."""
+    click.echo("Causemosifying data...")
+
+    input_file =  glob_input_file(input_file)
 
     return process(input_file, mapper, geo, output_file)
 
+
+@cli.command()
+@click.option("--inputs", type=str, default=None)
+@click.option("--geo", type=str, default=None)
+@click.option("--output-file", type=str, default="mixmasta_output")
+def causemosify_multi(inputs, geo, output_file):
+    """Process multiple input files to generate a single CauseMos compliant dataset."""
+
+    # --inputs is one long gnarly string with interior quotations escaped e.g.:
+    # "[{\"input_file\": \"build-a-date-qualifier_*.csv\",
+    #        \"mapper\": \"build-a-date-qualifier.json\"}]"
+
+    input_array = json.loads(inputs)
+
+    df = pd.DataFrame()
+    renamed_col_dict = {}
+    for item in input_array:
+        # Handle filename wildcards.
+        input_file =  glob_input_file(item["input_file"])
+        mapper = item["mapper"]
+
+        # Call process without writing parquet files.
+        result_df, result_dict = process(input_file, mapper, geo, output_file = None, write_output=False)
+
+        # Combine outputs to return single file.
+        df = result_df if df.empty else df.append(result_df)
+        renamed_col_dict = result_dict if not renamed_col_dict else {**renamed_col_dict, **result_dict}
+
+    # Separate string values from others
+    df['type'] = df[['value']].applymap(type)
+    df_str = df[df['type']==str]
+    df = df[df['type']!=str]
+    del(df_str['type'])
+    del(df['type'])
+
+    # Write parquet files
+    df.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
+    if len(df_str) > 0:
+        df_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
+
+    return df.append(df_str), renamed_col_dict
 
 @cli.command()
 @click.option("--xform", type=str, default=None)
