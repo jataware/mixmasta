@@ -52,8 +52,11 @@ def causemosify(input_file, mapper, geo, output_file):
 def causemosify_multi(inputs, geo, output_file):
     """Process multiple input files to generate a single CauseMos compliant dataset."""
 
-    with open(inputs) as f:
-        input_array = json.load(f)
+    # --inputs is one long gnarly string with interior quotations escaped e.g.:
+    # "[{\"input_file\": \"build-a-date-qualifier_*.csv\",
+    #        \"mapper\": \"build-a-date-qualifier.json\"}]"
+
+    input_array = json.loads(inputs)
 
     df = pd.DataFrame()
     renamed_col_dict = {}
