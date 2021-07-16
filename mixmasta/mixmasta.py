@@ -1,5 +1,4 @@
 """Main module."""
-import gc
 import json
 import logging
 import os
@@ -230,23 +229,22 @@ def generate_column_name(field_list: list) -> str:
     """
     return ''.join(sorted(field_list))
 
-def generate_timestamp(series: pd.Series, date_mapper: dict) -> str:
+def generate_timestamp_column(df: pd.DataFrame, date_mapper: dict, column_name: str) -> pd.DataFrame:
     """
     Description
     -----------
-    Generates a str in M/D/Y H:M format from collected Month, Day,
-    Year, Hour, Minute values in a parameter pandas series. Fills Month, Day,
-    Year, Hour, Minute if missing, but at least one should be present to
-    generate the value. Used to generate a timestamp in the absence of one in
-    the data.
+    Efficiently add a new timestamp column to a dataframe. It avoids the use of df.apply
+    which appears to be much slower for large dataframes. Defaults to 1/1/1970 for
+    missing day/month/year values.
 
     Parameters
     ----------
-    row: pd.Series
-        a pandas series containing date data
+    df: pd.DataFrame
+        our data
     date_mapper: dict
         a schema mapping (JSON) for the dataframe filtered for "date_type" equal to
-        Day, Month, or Year.
+        Day, Month, or Year. The format is screwy for our purposes here and could
+        be reafactored.
     column_name: str
         name of the new column e.g. timestamp for primary_time, year1month1day1
         for a concatneated name from associated date fields.
@@ -258,22 +256,54 @@ def generate_timestamp(series: pd.Series, date_mapper: dict) -> str:
             column_name="year1month1day", axis=1))
     """
 
-    # Default to 1/1/1970
-    day = 1
-    month = 1
-    year = 70
+    # Identify which date values are passed.
+    dayCol = None
+    monthCol = None
+    yearCol = None
 
     for kk, vv in date_mapper.items():
         if vv and vv["date_type"] == "day":
-            day = series[kk]
+            dayCol = kk
         elif vv and vv["date_type"] == "month":
-            month = series[kk]
+           monthCol = kk
         elif vv and vv["date_type"] == "year":
-            year = str(series[kk])
+            yearCol = kk
 
-    timestamp =  '/'.join([str(month),str(day),str(year)])
-    #return pd.Series(timestamp, index=[column_name])
-    return timestamp
+    # For missing date values, add a column to the dataframe with the default
+    # value, then assign that to the day/month/year var. If the dataframe has
+    # the date value, assign day/month/year to it after casting as a str.
+    if dayCol:
+        day = df[dayCol].astype(str)
+    else:
+       df['day_generate_timestamp_column'] = "1"
+       day = df['day_generate_timestamp_column']
+
+    if monthCol:
+        month = df[monthCol].astype(str)
+    else:
+       df['month_generate_timestamp_column'] = "1"
+       month = df['month_generate_timestamp_column']
+
+    if yearCol:
+        year = df[yearCol].astype(str)
+    else:
+        df['year_generate_timestamp_column'] = "01"
+        year = df['year_generate_timestamp_column']
+
+    # Add the new column
+    df[column_name] = month + '/' + day + '/' + year
+
+    # Delete the temporary columns
+    if not dayCol:
+        del(df['day_generate_timestamp_column'])
+
+    if not monthCol:
+        del(df['month_generate_timestamp_column'])
+
+    if not yearCol:
+        del(df['year_generate_timestamp_column'])
+
+    return df
 
 def generate_timestamp_format(date_mapper: dict) -> str:
     """
@@ -631,6 +661,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
     mapper_keys = []
     for k in mapper.items():
         mapper_keys.extend([l['name'] for l in k[1] if 'name' in l])
+
     df = df[mapper_keys]
 
     # Rename protected columns
@@ -710,8 +741,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
         date_df = df[ assoc_fields ]
 
         # Now generate the timestamp from date_df and add timestamp col to df.
-        new_series = date_df.apply(generate_timestamp, date_mapper=primary_date_group_mapper, axis=1)
-        df = df.join(new_series.rename("timestamp"))
+        df = generate_timestamp_column(df, primary_date_group_mapper, "timestamp")
 
         # Determine the correct time format for the new date column, and
         # convert to epoch time.
@@ -765,9 +795,8 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
         # or a month 9 to 9.0, which breaks generate_timestamp()
         date_df = df[ assoc_fields ]
 
-        # Now generate the timestamp from date_df and add the new_column to df.
-        new_series = date_df.apply(generate_timestamp, date_mapper=assoc_columns_dict, axis=1)
-        df = df.join(new_series.rename(new_column_name))
+        # Now generate the timestamp from date_df and add timestamp col to df.
+        df = generate_timestamp_column(df, assoc_columns_dict, new_column_name)
 
         # Determine the correct time format for the new date column, and
         # convert to epoch time only if all three date components (day, month,
@@ -986,6 +1015,14 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
     return df_out[col_order], renamed_col_dict
 
 def optimize_df_types(df: pd.DataFrame):
+    """
+    Pandas will upcast essentially everything. This will use the built-in
+    Pandas function to_numeeric to downcast dataframe series to types that use
+    less memory e.g. float64 to float32.
+
+    For very large dataframes the memory reduction should translate into
+    increased efficieny.
+    """
     floats = df.select_dtypes(include=['float64']).columns.tolist()
     df[floats] = df[floats].apply(pd.to_numeric, downcast='float')
 
@@ -1048,12 +1085,11 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True)
     ## Make mapper contain only keys for date, geo, and feature.
     mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 
-    # Optimize the dataframe types to reduce memory use.
+    ## To speed up normalize(), reduce the memory size of the dataframe by:
+    # 1. Optimize the dataframe types.
+    # 2. Reset the index so it is a RangeIndex instead of Int64Index.
     df = optimize_df_types(df)
-
-    # Reset the index so it is a RangeIndex instead of Int64Index.
     df.reset_index(inplace=True, drop=True)
-    #print(f"shape\n{df.shape}\ninfo\n{df.info()}\nmemory usage\n{df.memory_usage(index=True, deep=True)}\n{df.memory_usage(index=True, deep=True).sum()}")
 
     ## Run normailizer.
     norm, renamed_col_dict = normalizer(df, mapper, admin)
@@ -1077,9 +1113,13 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True)
         if len(norm_str) > 0:
             norm_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
 
-        return norm.append(norm_str), renamed_col_dict
-    else:
-        return norm, renamed_col_dict
+        norm = norm.append(norm_str)
+
+    # Reduce memory size of returned dataframe.
+    norm = optimize_df_types(norm)
+    norm.reset_index(inplace=True, drop=True)
+
+    return norm, renamed_col_dict
 
 def raster2df(
     InRaster: str,
@@ -1179,7 +1219,7 @@ def raster2df(
                 # need to exclude NaN values since there is no nodataval
                 row_value = RowData[ThisCol]
 
-                if (row_value != nData) and not (np.isnan(row_value)):
+                if (row_value > nData) and not (np.isnan(row_value)):
 
                     # TODO: implement filters on valid pixels
                     # for example, the below would ensure pixel values are between -100 and 100
@@ -1231,26 +1271,16 @@ def raster2df(
 #fp = "examples/causemosify-tests/flood_monthly.tif"
 #mp = "examples/causemosify-tests/flood_monthly.json"
 
+#fp = "examples/causemosify-tests/raw_data_qualifies.csv"
+#mp = "examples/causemosify-tests/mixmasta_ready_annotations_qualifies.json"
+#geo = 'admin1'
+#outf = 'examples/causemosify-tests/testing'
 
-fp = "examples/causemosify-tests/raw_data_qualifies.csv"
-mp = "examples/causemosify-tests/mixmasta_ready_annotations_qualifies.json"
-geo = 'admin1'
-outf = 'examples/causemosify-tests/testing'
-
-start_time = timeit.default_timer()
-df, dct = process(fp, mp,geo, outf)
-
-print('process time', timeit.default_timer() - start_time)
-print('\n', df.head())
-print('\n', df.tail())
-print('\n', df.shape)
-print('\nrenamed column dictionary\n', dct)
-
-""" """
-
-#mapper = json.loads(open(mp).read())
-#mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
-#df = pd.read_csv(fp)
-#norm, changed_cols = normalizer(df, mapper, geo)
-#print('\n', norm.head(50))
-#print('\n', norm.tail(50))
+#start_time = timeit.default_timer()
+#df, dct = process(fp, mp,geo, outf)
+#print('process time', timeit.default_timer() - start_time)
+#print('\n', df.head())
+#print('\n', df.tail())
+#print('\n', df.shape)
+#print('\nrenamed column dictionary\n', dct)
+#print(f"shape\n{df.shape}\ninfo\n{df.info()}\nmemory usage\n{df.memory_usage(index=True, deep=True)}\n{df.memory_usage(index=True, deep=True).sum()}")
