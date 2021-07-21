@@ -58,9 +58,7 @@ class TestMixmaster(unittest.TestCase):
 
     def test_002_process(self):
         """
-        Test GeoTiff
-
-        This tests that multi-band geotiff processing is the same. Uses the
+        Test GeoTiff This tests that multi-band geotiff processing is the same. Uses the
         asset_wealth tif which has 4 bands of different years representing a
         measure of wealth.
         """
