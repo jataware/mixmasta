@@ -113,11 +113,11 @@ class DateAnnotation(BaseModel):
         example=["crop_production", "malnutrition_rate"],
     )
 
-    @validator('date_type')
-    def time_format_optional(cls, v, values):
-        if v == DateType.DATE and values["time_format"] == None:
-            raise ValueError('time_format is required for when date_type is date')
-        return v
+    #@validator('date_type')
+    #def time_format_optional(cls, v, values):
+    #    if v == DateType.DATE and values["time_format"] == None:
+    #        raise ValueError('time_format is required for when date_type is date')
+    #    return v
 
     @validator('associated_columns')
     def validate_associated_columns(cls, v):
@@ -153,7 +153,21 @@ class Meta(BaseModel):
     band: Optional[str]
     sheet: Optional[str]
     date: Optional[str]
+    # info needed for multi-band geotiffs:
+    feature_name: Optional[str]   # what the values represent e.g. wealth, flooding, headcount
+    null_value: Optional[float]   # usually mixmasta will just determine this from the .tif file
+    band_name: Optional[str]      # this will be the column name for the bands e.g. "year", "month_year"
+    bands: Optional[dict] = Field(
+        title="Geotiff Bands",
+        description="dictionary str:object of band number:band value (value can be float, str, etc.)",
+        example={
+			"1": 2018,
+			"2": 2019,
+			"3": 2020,
+			"4": 2021
+		}
 
+    )
 
 ############################
 #### DEFINE FINAL MODEL ####

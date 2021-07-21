@@ -25,9 +25,22 @@ from fuzzywuzzy import process
 import timeit
 #from .spacetag_schema import SpaceModel
 
+# Constants
+COL_ORDER = [
+        "timestamp",
+        "country",
+        "admin1",
+        "admin2",
+        "admin3",
+        "lat",
+        "lng",
+        "feature",
+        "value",
+    ]
+
+
 if not sys.warnoptions:
     import warnings
-
     warnings.simplefilter("ignore")
 
 logger = logging.getLogger(__name__)
@@ -502,9 +515,6 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
         gadm["admin3"] = gadm["NAME_3"]
         gadm = gadm[["country", "state", "admin1", "admin2", "admin3"]]
 
-    #print('load time', timeit.default_timer() - start_time)
-    #start_time = timeit.default_timer()
-
     # Filter GADM for countries in df.
     countries = df["country"].unique()
 
@@ -554,8 +564,6 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
                     match = fuzzywuzzy.process.extractOne(unk, admin3_list, scorer=fuzz.ratio)
                     if match != None:
                         df.loc[df.admin3 == unk, 'admin3'] = match[0]
-
-    #print('processing time', timeit.default_timer() - start_time)
 
     return df
 
@@ -617,17 +625,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
     --------
     >>> df_norm = normalizer(df, mapper, 'admin3')
     """
-    col_order = [
-        "timestamp",
-        "country",
-        "admin1",
-        "admin2",
-        "admin3",
-        "lat",
-        "lng",
-        "feature",
-        "value",
-    ]
+    col_order = COL_ORDER.copy()
 
     required_cols = [
         "timestamp",
@@ -1029,11 +1027,11 @@ def optimize_df_types(df: pd.DataFrame):
     ints = df.select_dtypes(include=['int64']).columns.tolist()
     df[ints] = df[ints].apply(pd.to_numeric, downcast='integer')
 
-    for col in df.select_dtypes(include=['object']):
-        num_unique_values = len(df[col].unique())
-        num_total_values = len(df[col])
-        if float(num_unique_values) / num_total_values < 0.5:
-            df[col] = df[col].astype('category')
+    #for col in df.select_dtypes(include=['object']):
+    #    num_unique_values = len(df[col].unique())
+    #    num_total_values = len(df[col])
+    #    if float(num_unique_values) / num_total_values < 0.5:
+    #        df[col] = df[col].astype('category')
 
     return df
 
@@ -1069,7 +1067,7 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True)
         df = raster2df(
             InRaster = fp,
             feature_name = transform["feature_name"],
-            band = int(transform["band"]),
+            band = int(transform["band"] if transform["band"] else "0"),
             nodataval = int(transform["null_val"]),
             date = d,
             band_name = transform["band_name"],
@@ -1101,7 +1099,18 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True)
     norm.fillna(value=np.nan, inplace=True)
 
     if write_output:
-        # Separate string values from others
+        # If any qualify columns were added, the feature_type must be enforced
+        # here because pandas will have cast strings as ints etc.
+        qualify_cols = set(norm.columns).difference(set(COL_ORDER))
+        for col in qualify_cols:
+            for feature_dict in mapper["feature"]:
+                if feature_dict["name"] == col and feature_dict["feature_type"] == 'string':
+                    norm[col] = norm[col].astype(str)
+
+        # Separate string from other dtypes in value column.
+        # This is predicated on the assumption that qualifying feature columns
+        # are of a single dtype.
+
         norm['type'] = norm[['value']].applymap(type)
         norm_str = norm[norm['type']==str]
         norm = norm[norm['type']!=str]
@@ -1271,14 +1280,26 @@ def raster2df(
 #fp = "examples/causemosify-tests/flood_monthly.tif"
 #mp = "examples/causemosify-tests/flood_monthly.json"
 
-#fp = "examples/causemosify-tests/raw_data_qualifies.csv"
-#mp = "examples/causemosify-tests/mixmasta_ready_annotations_qualifies.json"
-#geo = 'admin1'
+#fp = "examples/causemosify-tests/Kenya - Admin1_Pasture_NDVI_2019-2021 converted.csv"
+#mp = "examples/causemosify-tests/kenya_pasture.json"
+
+#fp = "examples/causemosify-tests/rainfall_error.xlsx"
+#mp = "examples/causemosify-tests/rainfall_error.json"
+#geo = 'admin2'
 #outf = 'examples/causemosify-tests/testing'
+
+#mp = 'tests/inputs/test3_qualifies.json'
+#fp = 'tests/inputs/test3_qualifies.csv'
+#geo = 'admin2'
+#outf = 'tests/outputs/unittests'
 
 #start_time = timeit.default_timer()
 #df, dct = process(fp, mp,geo, outf)
 #print('process time', timeit.default_timer() - start_time)
+#cols = ['timestamp','country','admin1','admin2','admin3','lat','lng','feature','value']
+#df.sort_values(by=cols, inplace=True)
+#df.reset_index(drop=True, inplace=True)
+#df.to_csv("tests/outputs/test4_rainfall_error_output.csv", index = False)
 #print('\n', df.head())
 #print('\n', df.tail())
 #print('\n', df.shape)
