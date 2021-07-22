@@ -214,8 +214,8 @@ def geocode(
         gadm["admin3"] = gadm["NAME_3"]
         gadm = gadm[["geometry", "country", "state", "admin1", "admin2", "admin3"]]
 
+    df.loc[:, "geometry"] = df.apply(lambda row: Point(row[x], row[y]), axis=1)
 
-    df["geometry"] = df.apply(lambda row: Point(row[x], row[y]), axis=1)
     gdf = gpd.GeoDataFrame(df)
 
     # Spatial merge on GADM to obtain admin areas
@@ -288,23 +288,23 @@ def generate_timestamp_column(df: pd.DataFrame, date_mapper: dict, column_name: 
     if dayCol:
         day = df[dayCol].astype(str)
     else:
-       df['day_generate_timestamp_column'] = "1"
+       df.loc[:, 'day_generate_timestamp_column'] = "1"
        day = df['day_generate_timestamp_column']
 
     if monthCol:
         month = df[monthCol].astype(str)
     else:
-       df['month_generate_timestamp_column'] = "1"
+       df.loc[:, 'month_generate_timestamp_column'] = "1"
        month = df['month_generate_timestamp_column']
 
     if yearCol:
         year = df[yearCol].astype(str)
     else:
-        df['year_generate_timestamp_column'] = "01"
+        df.loc[:, 'year_generate_timestamp_column'] = "01"
         year = df['year_generate_timestamp_column']
 
     # Add the new column
-    df[column_name] = month + '/' + day + '/' + year
+    df.loc[:, column_name] = month + '/' + day + '/' + year
 
     # Delete the temporary columns
     if not dayCol:
@@ -676,7 +676,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
             # the loaded schema.
             if date_dict["date_type"] == "date":
                 # convert primary_time of date_type date to epochtime and rename as 'timestamp'
-                df[kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
+                df.loc[:, kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
                 staple_col_name = "timestamp"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
                 # renamed_col_dict[ staple_col_name ] = [kk] # 7/2/2021 do not include primary cols
@@ -691,7 +691,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
         else:
             if date_dict["date_type"] == "date":
                 # Convert all date/time to epoch time if not already.
-                df[kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
+                df.loc[:, kk] = df[kk].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
                 # If three are no assigned primary_time columns, make this the
                 # primary_time timestamp column, and keep as a feature so the
                 # column_name meaning is not lost.
@@ -802,7 +802,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
         date_types = [v["date_type"] for k,v in assoc_columns_dict.items()]
         if len(frozenset(date_types).intersection(MONTH_DAY_YEAR)) == 3:
             time_formatter = generate_timestamp_format(assoc_columns_dict)
-            df[new_column_name] = df[new_column_name].apply(lambda x: format_time(str(x), time_formatter, validate=False))
+            df.loc[:, new_column_name] = df[new_column_name].apply(lambda x: format_time(str(x), time_formatter, validate=False))
 
         # Let SpaceTag know those date columns were renamed to a new column.
         renamed_col_dict[ new_column_name] = assoc_fields
@@ -852,7 +852,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
                 # use ISO2/3 lookup dictionary to change ISO to country name.
                 iso_list = df[kk].unique().tolist()
                 dct = get_iso_country_dict(iso_list)
-                df[kk] = df[kk].apply(lambda x: dct[x] if x in dct else x)
+                df.loc[:, kk] = df[kk].apply(lambda x: dct[x] if x in dct else x)
 
                 # now rename that column as "country"
                 staple_col_name = "country"
