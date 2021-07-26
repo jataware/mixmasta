@@ -9,7 +9,9 @@ from .download import download_and_clean
 from .mixmasta import geocode, netcdf2df, process, raster2df
 
 from glob import glob
+
 import json
+
 
 @click.group()
 def cli():
@@ -41,7 +43,6 @@ def causemosify(input_file, mapper, geo, output_file):
     click.echo("Causemosifying data...")
 
     input_file =  glob_input_file(input_file)
-
     return process(input_file, mapper, geo, output_file)
 
 
