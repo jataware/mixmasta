@@ -1,0 +1,67 @@
+{
+	"geo": [
+		{
+			"name": "country",
+			"display_name": "Country",
+			"description": "pri",
+			"type": "geo",
+			"geo_type": "country"
+		},
+		{
+			"name": "longitude",
+			"display_name": "longitude",
+			"description": "pri geo",
+			"type": "geo",
+			"geo_type": "longitude",
+			"primary_geo": true,
+			"is_geo_pair": "latitude"
+		},
+		{
+			"name": "latitude",
+			"display_name": "Latitude",
+			"description": "pri geo",
+			"type": "geo",
+			"geo_type": "latitude",
+			"primary_geo": true,
+			"is_geo_pair": "longitude"
+		}
+	],
+	"date": [
+		{
+			"name": "date",
+			"display_name": "Date",
+			"description": "pri time",
+			"type": "date",
+			"date_type": "date",
+			"time_format": "%Y-%m-%d",
+			"primary_date": true
+		}
+	],
+	"feature": [
+		{
+			"name": "pop",
+			"display_name": "Pop",
+			"description": "pri feat",
+			"type": "feature",
+			"feature_type": "int",
+			"units": "asdcasd",
+			"units_description": "asdcas"
+		},
+		{
+			"name": "primary_industry",
+			"display_name": "Primary Industry",
+			"description": "qual feat",
+			"type": "feature",
+			"feature_type": "string",
+			"units": "ascas",
+			"units_description": "asdca",
+			"qualifies": [
+				"pop",
+				"country"
+			]
+		}
+	],
+	"meta": {
+		"ftype": "csv"
+	}
+}
