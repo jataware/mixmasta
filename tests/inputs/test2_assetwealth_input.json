@@ -1,0 +1,89 @@
+{
+    "geo":
+    [
+        {
+			"name": "longitude",
+			"display_name": "longitude",
+			"description": "pri geo",
+			"type": "geo",
+			"geo_type": "longitude",
+			"primary_geo": true,
+			"is_geo_pair": "latitude"
+		},
+		{
+			"name": "latitude",
+			"display_name": "Latitude",
+			"description": "pri geo",
+			"type": "geo",
+			"geo_type": "latitude",
+			"primary_geo": true,
+			"is_geo_pair": "longitude"
+		}
+    ],
+    "date":
+    [
+        {
+            "name": "year",
+            "display_name": "year",
+            "description": "date",
+            "type": "date",
+            "date_type": "year",
+            "dateassociation": false,
+            "time_format": "%Y",
+            "associated_columns":
+            {
+
+            },
+            "qualifies":
+            [
+
+            ],
+            "primary_date": true
+        },
+		{
+            "name": "date",
+            "display_name": "date",
+            "description": "date",
+            "type": "date",
+            "date_type": "year",
+            "dateassociation": false,
+            "time_format": "%m/%d/%Y",
+            "associated_columns":
+            {
+
+            },
+            "qualifies":
+            [
+
+            ],
+            "primary_date": false
+        }
+    ],
+    "feature":
+    [
+        {
+            "name": "asset wealth",
+            "display_name": "asset wealth",
+            "description": "feat",
+            "type": "feature",
+            "feature_type": "int",
+            "units": "dollars",
+            "units_description": "dollars"
+        }
+    ],
+    "meta":
+    {
+        "ftype": "geotiff",
+        "date": "12/29/2004",
+        "feature_name": "asset wealth",
+        "band": "",
+        "null_val": 0,
+		"band_name": "year",
+		"bands":{
+			"1": 2018,
+			"2": 2019,
+			"3": 2020,
+			"4": 2021
+		}
+    }
+}

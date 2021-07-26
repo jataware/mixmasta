@@ -1,0 +1,107 @@
+timestamp,country,admin1,admin2,admin3,lat,lng,feature,value,primary_industry
+1588464000000,United States,Maryland,Baltimore,,39.310753,-76.617485,country_non_primary,United States,government
+1588464000000,United States,Maryland,Baltimore,,39.310753,-76.617485,pop,100000000,government
+1588464000000,United States,Maryland,Baltimore,,39.44729,-76.87317,country_non_primary,United States,government
+1588464000000,United States,Maryland,Baltimore,,39.44729,-76.87317,pop,100000000,government
+1588464000000,United States,Maryland,Caroline,,39.002052,-75.8009,country_non_primary,United States,government
+1588464000000,United States,Maryland,Caroline,,39.002052,-75.8009,pop,100000000,government
+1588464000000,United States,Maryland,Carroll,,39.652634,-77.17312,country_non_primary,United States,government
+1588464000000,United States,Maryland,Carroll,,39.652634,-77.17312,pop,100000000,government
+1588464000000,United States,Maryland,Cecil,,39.66227,-76.140434,country_non_primary,United States,government
+1588464000000,United States,Maryland,Cecil,,39.66227,-76.140434,pop,100000000,government
+1588464000000,United States,Maryland,Frederick,,39.668602,-77.48301,country_non_primary,United States,government
+1588464000000,United States,Maryland,Frederick,,39.668602,-77.48301,pop,100000000,government
+1588464000000,United States,Maryland,Harford,,39.641033,-76.28594,country_non_primary,United States,government
+1588464000000,United States,Maryland,Harford,,39.641033,-76.28594,pop,100000000,government
+1588464000000,United States,Maryland,Montgomery,,39.17386,-77.44403,country_non_primary,United States,government
+1588464000000,United States,Maryland,Montgomery,,39.17386,-77.44403,pop,100000000,government
+1588464000000,United States,Maryland,Washington,,39.433556,-77.74793,country_non_primary,United States,government
+1588464000000,United States,Maryland,Washington,,39.433556,-77.74793,pop,100000000,government
+1588464000000,United States,Maryland,Washington,,39.627853,-77.65221,country_non_primary,United States,government
+1588464000000,United States,Maryland,Washington,,39.627853,-77.65221,pop,100000000,government
+1588464000000,United States,New Jersey,Atlantic,,39.423126,-74.688156,country_non_primary,United States,government
+1588464000000,United States,New Jersey,Atlantic,,39.423126,-74.688156,pop,100000000,government
+1588464000000,United States,New Jersey,Burlington,,39.931423,-74.74401,country_non_primary,United States,government
+1588464000000,United States,New Jersey,Burlington,,39.931423,-74.74401,pop,100000000,government
+1588464000000,United States,New Jersey,Cumberland,,39.427124,-75.06667,country_non_primary,United States,government
+1588464000000,United States,New Jersey,Cumberland,,39.427124,-75.06667,pop,100000000,government
+1588464000000,United States,New Jersey,Gloucester,,39.74826,-75.210724,country_non_primary,United States,government
+1588464000000,United States,New Jersey,Gloucester,,39.74826,-75.210724,pop,100000000,government
+1588464000000,United States,New Jersey,Monmouth,,40.136845,-74.502754,country_non_primary,United States,government
+1588464000000,United States,New Jersey,Monmouth,,40.136845,-74.502754,pop,100000000,government
+1588464000000,United States,New Jersey,Morris,,40.874065,-74.612625,country_non_primary,United States,government
+1588464000000,United States,New Jersey,Morris,,40.874065,-74.612625,pop,100000000,government
+1588464000000,United States,New Jersey,Ocean,,39.80615,-74.26694,country_non_primary,United States,government
+1588464000000,United States,New Jersey,Ocean,,39.80615,-74.26694,pop,100000000,government
+1588464000000,United States,New Jersey,Salem,,39.490665,-75.33783,country_non_primary,United States,government
+1588464000000,United States,New Jersey,Salem,,39.490665,-75.33783,pop,100000000,government
+1588464000000,United States,New Jersey,Somerset,,40.713497,-74.670235,country_non_primary,United States,government
+1588464000000,United States,New Jersey,Somerset,,40.713497,-74.670235,pop,100000000,government
+1588464000000,United States,New Jersey,Warren,,40.76636,-75.14852,country_non_primary,United States,government
+1588464000000,United States,New Jersey,Warren,,40.76636,-75.14852,pop,100000000,government
+1588464000000,United States,Pennsylvania,Bucks,,40.320614,-75.31616,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Bucks,,40.320614,-75.31616,pop,100000000,government
+1588464000000,United States,Pennsylvania,Bucks,,40.473606,-75.41474,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Bucks,,40.473606,-75.41474,pop,100000000,government
+1588464000000,United States,Pennsylvania,Carbon,,40.773224,-75.68472,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Carbon,,40.773224,-75.68472,pop,100000000,government
+1588464000000,United States,Pennsylvania,Centre,,40.976955,-77.2619,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Centre,,40.976955,-77.2619,pop,100000000,government
+1588464000000,United States,Pennsylvania,Chester,,39.97322,-75.668816,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Chester,,39.97322,-75.668816,pop,100000000,government
+1588464000000,United States,Pennsylvania,Cumberland,,40.17673,-77.44442,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Cumberland,,40.17673,-77.44442,pop,100000000,government
+1588464000000,United States,Pennsylvania,Dauphin,,40.310837,-76.70905,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Dauphin,,40.310837,-76.70905,pop,100000000,government
+1588464000000,United States,Pennsylvania,Franklin,,39.723965,-77.592735,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Franklin,,39.723965,-77.592735,pop,100000000,government
+1588464000000,United States,Pennsylvania,Huntingdon,,40.201588,-77.81563,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Huntingdon,,40.201588,-77.81563,pop,100000000,government
+1588464000000,United States,Pennsylvania,Huntingdon,,40.479633,-77.94563,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Huntingdon,,40.479633,-77.94563,pop,100000000,government
+1588464000000,United States,Pennsylvania,Juniata,,40.61892,-77.13508,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Juniata,,40.61892,-77.13508,pop,100000000,government
+1588464000000,United States,Pennsylvania,Lancaster,,40.157314,-76.06899,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Lancaster,,40.157314,-76.06899,pop,100000000,government
+1588464000000,United States,Pennsylvania,Lebanon,,40.40081,-76.45318,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Lebanon,,40.40081,-76.45318,pop,100000000,government
+1588464000000,United States,Pennsylvania,Lebanon,,40.401302,-76.64834,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Lebanon,,40.401302,-76.64834,pop,100000000,government
+1588464000000,United States,Pennsylvania,Lebanon,,40.525085,-76.49186,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Lebanon,,40.525085,-76.49186,pop,100000000,government
+1588464000000,United States,Pennsylvania,Monroe,,40.876575,-75.41979,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Monroe,,40.876575,-75.41979,pop,100000000,government
+1588464000000,United States,Pennsylvania,Montgomery,,40.156166,-75.442375,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Montgomery,,40.156166,-75.442375,pop,100000000,government
+1588464000000,United States,Pennsylvania,Montgomery,,40.218674,-75.214134,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Montgomery,,40.218674,-75.214134,pop,100000000,government
+1588464000000,United States,Pennsylvania,Montgomery,,40.246235,-75.32099,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Montgomery,,40.246235,-75.32099,pop,100000000,government
+1588464000000,United States,Pennsylvania,Perry,,40.310265,-77.11603,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Perry,,40.310265,-77.11603,pop,100000000,government
+1588464000000,United States,Pennsylvania,Perry,,40.50595,-76.99629,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Perry,,40.50595,-76.99629,pop,100000000,government
+1588464000000,United States,Pennsylvania,Schuylkill,,40.516853,-76.35497,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Schuylkill,,40.516853,-76.35497,pop,100000000,government
+1588464000000,United States,Pennsylvania,Schuylkill,,40.725918,-76.38031,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Schuylkill,,40.725918,-76.38031,pop,100000000,government
+1588464000000,United States,Pennsylvania,Schuylkill,,40.751495,-75.863304,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Schuylkill,,40.751495,-75.863304,pop,100000000,government
+1588464000000,United States,Pennsylvania,Snyder,,40.71118,-76.98463,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,Snyder,,40.71118,-76.98463,pop,100000000,government
+1588464000000,United States,Pennsylvania,York,,39.828693,-76.7185,country_non_primary,United States,government
+1588464000000,United States,Pennsylvania,York,,39.828693,-76.7185,pop,100000000,government
+1588464000000,United States,West Virginia,Berkeley,,39.587597,-77.88867,country_non_primary,United States,government
+1588464000000,United States,West Virginia,Berkeley,,39.587597,-77.88867,pop,100000000,government
+1588464000000,United States,West Virginia,Jefferson,,39.268486,-77.94955,country_non_primary,United States,government
+1588464000000,United States,West Virginia,Jefferson,,39.268486,-77.94955,pop,100000000,government
+1588464000000,,,,,39.03913,-76.362305,country_non_primary,United States,government
+1588464000000,,,,,39.03913,-76.362305,pop,100000000,government
+1588464000000,,,,,39.055695,-74.198524,country_non_primary,United States,government
+1588464000000,,,,,39.055695,-74.198524,pop,100000000,government
+1588464000000,,,,,39.21922,-75.31236,country_non_primary,United States,government
+1588464000000,,,,,39.21922,-75.31236,pop,100000000,government
+1588464000000,,,,,39.38706,-74.023834,country_non_primary,United States,government
+1588464000000,,,,,39.38706,-74.023834,pop,100000000,government
+1588464000000,,,,,39.67722,-74.136215,country_non_primary,United States,government
+1588464000000,,,,,39.67722,-74.136215,pop,100000000,government
