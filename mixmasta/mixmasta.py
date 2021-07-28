@@ -846,6 +846,19 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
                 staple_col_name = "country"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
                 #renamed_col_dict[staple_col_name] = [kk] # 7/2/2021 do not include primary cols
+            elif geo_dict["geo_type"] == "state/territory" and kk != "admin1":
+                # force the country column to be named country
+                staple_col_name = "admin1"
+                df.rename(columns={kk: staple_col_name}, inplace=True)
+            elif geo_dict["geo_type"] == "county/district" and kk != "admin2":
+                # force the country column to be named country
+                staple_col_name = "admin2"
+                df.rename(columns={kk: staple_col_name}, inplace=True)
+            elif geo_dict["geo_type"] == "municipality/town" and kk != "admin2":
+                # force the country column to be named country
+                staple_col_name = "admin3"
+                df.rename(columns={kk: staple_col_name}, inplace=True)
+
             elif str(geo_dict["geo_type"]).lower() in ["iso2", "iso3"]:
                 # use the ISO2 or ISO3 column as country
 
@@ -1292,6 +1305,11 @@ def raster2df(
 #fp = 'tests/inputs/test3_qualifies.csv'
 #geo = 'admin2'
 #outf = 'tests/outputs/unittests'
+
+#fp = "examples/causemosify-tests/hoa_conflict.csv"
+#mp = "examples/causemosify-tests/hoa_conflict.json"
+#geo = 'admin2'
+#outf = 'examples/causemosify-tests'
 
 #start_time = timeit.default_timer()
 #df, dct = process(fp, mp,geo, outf)
