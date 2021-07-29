@@ -1080,11 +1080,11 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True)
         df = raster2df(
             InRaster = fp,
             feature_name = transform["feature_name"],
-            band = int(transform["band"] if transform["band"] else "0"),
+            band = int(transform["band"] if "band" in transform else "0"),
             nodataval = int(transform["null_val"]),
             date = d,
             band_name = transform["band_name"],
-            bands = transform["bands"]
+            bands = transform["bands"] if "bands" in transform else None
         )
     elif ftype == 'excel':
         df = pd.read_excel(fp, transform['sheet'])
@@ -1204,7 +1204,7 @@ def raster2df(
         if band > 0 and band != x:
             continue
 
-        band_value = bands[str(x)]
+        band_value = bands[str(x)] if bands is not None else band_name
         rBand = ds.GetRasterBand(x)  # (band) # first band
         nData = rBand.GetNoDataValue()
 
@@ -1308,6 +1308,11 @@ def raster2df(
 
 #fp = "examples/causemosify-tests/hoa_conflict.csv"
 #mp = "examples/causemosify-tests/hoa_conflict.json"
+#geo = 'admin2'
+#outf = 'examples/causemosify-tests'
+
+#fp = "examples/causemosify-tests/maxent_Ethiopia_precipChange.0.8tempChange.-0.3.tif"
+#mp = "examples/causemosify-tests/maxent_Ethiopia_precipChange.0.8tempChange.-0.3.json"
 #geo = 'admin2'
 #outf = 'examples/causemosify-tests'
 
