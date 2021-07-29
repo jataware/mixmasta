@@ -32,7 +32,7 @@ class TestMixmaster(unittest.TestCase):
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
-
+        gc.collect()
         # Delete any output parquet files.
         try:
             os.remove(f"outputs{sep}unittests.parquet.gzip")
@@ -118,8 +118,8 @@ class TestMixmaster(unittest.TestCase):
         # Sort and reindex.
         df.sort_values(by=cols, inplace=True)
         df.reset_index(drop=True, inplace=True)
-        output_df.reset_index(drop =True, inplace=True)
         output_df.sort_values(by=cols, inplace=True)
+        output_df.reset_index(drop =True, inplace=True)
 
         # Assertions
         assert_frame_equal(df, output_df, check_categorical = False)
@@ -259,10 +259,94 @@ class TestMixmaster(unittest.TestCase):
         # Assertion
         assert_frame_equal(df, output_df, check_categorical = False)
 
+    def test_006_process(self):
+        """Test multi primary_geo, resolve_to_gadm"""
+
+        # Define mixmasta inputs:
+        mp = f'inputs{sep}test6_hoa_conflict_input.json'
+        fp = f'inputs{sep}test6_hoa_conflict_input.csv'
+        geo = 'admin2'
+        outf = f'outputs{sep}unittests'
+
+        # Process:
+        df, dct = mixmasta.process(fp, mp, geo, outf)
+
+        # Load expected output:
+        output_df = pd.read_csv(f'outputs{sep}test6_hoa_conflict_output.csv', index_col=False)
+        output_df = mixmasta.optimize_df_types(output_df)
+        with open(f'outputs{sep}test6_hoa_conflict_dict.json') as f:
+            output_dict = json.loads(f.read())
+
+        # Sort both data frames and reindex for comparison,.
+        cols = ['timestamp','country','admin1','admin2','admin3','lat','lng','feature','value']
+        df.sort_values(by=cols, inplace=True)
+        output_df.sort_values(by=cols, inplace=True)
+
+        df.reset_index(drop=True, inplace=True)
+        output_df.reset_index(drop =True, inplace=True)
+
+        # Make the datatypes the same for value/feature and qualifying columns.
+        df['value'] = df['value'].astype('str')
+        df['feature'] = df['feature'].astype('str')
+        output_df['value'] = output_df['value'].astype('str')
+        output_df['feature'] = output_df['feature'].astype('str')
+
+        # Assertions
+        assert_frame_equal(df, output_df, check_categorical = False)
+        assert_dict_equal(dct, output_dict)
+
+    def test_007_single_band_tif(self):
+        """ This tests single-band geotiff processing."""
+
+        # Define mixmasta inputs:
+        mp = f'inputs{sep}test7_single_band_tif_input.json'
+        fp = f'inputs{sep}test7_single_band_tif_input.tif'
+        geo = 'admin2'
+        outf = f'outputs{sep}unittests'
+
+        # Process:
+        df, dct = mixmasta.process(fp, mp, geo, outf)
+        #categories = df.select_dtypes(include=['category']).columns.tolist()
+        df['value'] = df['value'].astype('str')
+
+        # Load expected output:
+        output_df = pd.read_csv(f'outputs{sep}test7_single_band_tif_output.csv', index_col=False)
+
+        with open(f'outputs{sep}test7_single_band_tif_dict.json') as f:
+            output_dict = json.loads(f.read())
+
+        # Sort both data frames and reindex for comparison,.
+        cols = ['timestamp','country','admin1','admin2','admin3','lat','lng','feature','value']
+        df = df[cols]
+        output_df = output_df[cols]
+
+        # Optimize datatypes for output_df.
+        floats = output_df.select_dtypes(include=['float64']).columns.tolist()
+        output_df[floats] = output_df[floats].apply(pd.to_numeric, downcast='float')
+
+        ints = output_df.select_dtypes(include=['int64']).columns.tolist()
+        output_df[ints] = output_df[ints].apply(pd.to_numeric, downcast='integer')
+
+        # Standardize value and feature columns to str for comparison.
+        df['value'] = df['value'].astype('str')
+        df['feature'] = df['feature'].astype('str')
+        output_df['value'] = output_df['value'].astype('str')
+        output_df['feature'] = output_df['feature'].astype('str')
+
+        # Sort and reindex.
+        df.sort_values(by=cols, inplace=True)
+        df.reset_index(drop=True, inplace=True)
+
+        output_df.sort_values(by=cols, inplace=True)
+        output_df.reset_index(drop=True, inplace=True)
+
+        # Assertions
+        assert_frame_equal(df, output_df, check_categorical = False)
+        assert_dict_equal(dct, output_dict)
+
+
 if __name__ == '__main__':
     unittest.main()
-
-
 
 """
 Test by: > /usr/bin/python3.8 -m unittest /workspaces/mixmasta/tests/test_mixmasta.py -v
