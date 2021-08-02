@@ -1,0 +1,62 @@
+{
+	"geo": [
+		{
+			"name": "ADMIN1",
+			"display_name": "Admin1",
+			"description": "state",
+			"type": "geo",
+			"geo_type": "state/territory",
+			"primary_geo": true,
+			"resolve_to_gadm": true
+		},
+		{
+			"name": "CountryOfAsylum",
+			"display_name": "Country",
+			"description": "other country",
+			"type": "geo",
+			"geo_type": "country"
+		},
+		{
+			"name": "ADMIN0",
+			"display_name": "Admin0",
+			"description": "c",
+			"type": "geo",
+			"geo_type": "country",
+			"primary_geo": true
+		},
+		{
+			"name": "ADMIN2",
+			"display_name": "Admin2",
+			"description": "ddd",
+			"type": "geo",
+			"geo_type": "county/district",
+			"primary_geo": true,
+			"resolve_to_gadm": false
+		}
+	],
+	"date": [
+		{
+			"name": "month_year",
+			"display_name": "Month Year",
+			"description": "rgg",
+			"type": "date",
+			"date_type": "date",
+			"time_format": "%Y-%m",
+			"primary_date": true
+		}
+	],
+	"feature": [
+		{
+			"name": "Day",
+			"display_name": "Day",
+			"description": "ddd",
+			"type": "feature",
+			"feature_type": "int",
+			"units": "d",
+			"units_description": "d"
+		}
+	],
+	"meta": {
+		"ftype": "csv"
+	}
+}

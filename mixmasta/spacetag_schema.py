@@ -64,6 +64,7 @@ class GeoAnnotation(BaseModel):
     type: ColumnType = "geo"
     geo_type: GeoType
     primary_geo: Optional[bool]
+    resolve_to_gadm: Optional[bool]
     is_geo_pair: Optional[str] = Field(
         title="Geo Pair",
         description="If present, this is the name of a paired coordinate column.",
