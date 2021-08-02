@@ -38,6 +38,10 @@ COL_ORDER = [
         "value",
     ]
 
+GEO_TYPE_COUNTRY = "country"
+GEO_TYPE_ADMIN1  = "state/territory"
+GEO_TYPE_ADMIN2  = "county/district"
+GEO_TYPE_ADMIN3  = "municipality/town"
 
 if not sys.warnoptions:
     import warnings
@@ -468,7 +472,7 @@ def handle_colname_collisions(df: pd.DataFrame, mapper: dict, protected_cols: li
 
     return df, mapper, renamed_col_dict
 
-def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
+def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list) -> pd.DataFrame:
     """
     Assumption
     ----------
@@ -481,6 +485,8 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
         the level to geocode to. Either 'admin2' or 'admin3'
     df: pandas.DataFrame
         the uploaded dataframe
+    resolve_to_gadm_geotypes:
+        list of geotypes marked resolve_to_gadm = True e.g. ["admin1", "country"]
 
     Result
     ------
@@ -493,8 +499,6 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
 
     cdir = os.path.expanduser("~")
     download_data_folder = f"{cdir}/mixmasta_data"
-
-    #start_time = timeit.default_timer()
 
     if admin == "admin2":
         gadm_fn = f"gadm36_2.feather"
@@ -519,12 +523,13 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
     countries = df["country"].unique()
 
     # Correct country names.
-    gadm_country_list = gadm["country"].unique()
-    unknowns = df[~df.country.isin(gadm_country_list)].country.tolist()
-    for unk in unknowns:
-        match = fuzzywuzzy.process.extractOne(unk, gadm_country_list, scorer=fuzz.ratio)
-        if match != None:
-            df.loc[df.country == unk, 'country'] = match[0]
+    if GEO_TYPE_COUNTRY in resolve_to_gadm_geotypes:
+        gadm_country_list = gadm["country"].unique()
+        unknowns = df[~df.country.isin(gadm_country_list)].country.tolist()
+        for unk in unknowns:
+            match = fuzzywuzzy.process.extractOne(unk, gadm_country_list, scorer=fuzz.ratio)
+            if match != None:
+                df.loc[df.country == unk, 'country'] = match[0]
 
     # Filter GADM dicitonary for only those countries (ie. speed up)
     gadm = gadm[gadm["country"].isin(countries)]
@@ -535,26 +540,28 @@ def match_geo_names(admin: str, df: pd.DataFrame) -> pd.DataFrame:
         # values exist for the appropriate country.
 
         # Get list of admin1 values in df but not in gadm. Reduce list for country.
-        admin1_list = gadm[gadm.country==c]["admin1"].unique()
-        if admin1_list is not None and all(admin1_list) and 'admin1' in df:
-            unknowns = df[(df.country == c) & ~df.admin1.isin(admin1_list)].admin1.tolist()
-            unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
-            for unk in unknowns:
-                match = fuzzywuzzy.process.extractOne(unk, admin1_list, scorer=fuzz.ratio)
-                if match != None:
-                    df.loc[df.admin1 == unk, 'admin1'] = match[0]
+        if GEO_TYPE_ADMIN1 in resolve_to_gadm_geotypes:
+            admin1_list = gadm[gadm.country==c]["admin1"].unique()
+            if admin1_list is not None and all(admin1_list) and 'admin1' in df:
+                unknowns = df[(df.country == c) & ~df.admin1.isin(admin1_list)].admin1.tolist()
+                unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
+                for unk in unknowns:
+                    match = fuzzywuzzy.process.extractOne(unk, admin1_list, scorer=fuzz.ratio)
+                    if match != None:
+                        df.loc[df.admin1 == unk, 'admin1'] = match[0]
 
         # Get list of admin2 values in df but not in gadm. Reduce list for country.
-        admin2_list = gadm[gadm.country==c ]["admin2"].unique()
-        if admin2_list is not None and all(admin2_list) and 'admin2' in df:
-            unknowns = df[(df.country == c) & ~df.admin2.isin(admin2_list)].admin2.tolist()
-            unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
-            for unk in unknowns:
-                match = fuzzywuzzy.process.extractOne(unk, admin2_list, scorer=fuzz.ratio)
-                if match != None:
-                    df.loc[df.admin2 == unk, 'admin2'] = match[0]
+        if GEO_TYPE_ADMIN2 in resolve_to_gadm_geotypes:
+            admin2_list = gadm[gadm.country==c ]["admin2"].unique()
+            if admin2_list is not None and all(admin2_list) and 'admin2' in df:
+                unknowns = df[(df.country == c) & ~df.admin2.isin(admin2_list)].admin2.tolist()
+                unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
+                for unk in unknowns:
+                    match = fuzzywuzzy.process.extractOne(unk, admin2_list, scorer=fuzz.ratio)
+                    if match != None:
+                        df.loc[df.admin2 == unk, 'admin2'] = match[0]
 
-        if admin =='admin3':
+        if admin =='admin3' and GEO_TYPE_ADMIN3 in resolve_to_gadm_geotypes:
             # Get list of admin3 values in df but not in gadm. Reduce list for country.
             admin3_list = gadm[gadm.country==c]["admin3"].unique()
             if admin3_list is not None and all(admin3_list) and 'admin3' in df:
@@ -644,12 +651,21 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
     # mapper for any column name collisions.
     df, mapper, renamed_col_dict = handle_colname_collisions(df, mapper, col_order)
 
-    # mapper is a dictionary of lists of dictionaries.
+    ### mapper is a dictionary of lists of dictionaries.
+
+    # list of names of datetime columns primary_date=True
     primary_time_cols = [k['name'] for k in mapper['date'] if 'primary_date' in k and k['primary_date'] == True]
+
+    # list of names of datetime columns no primary_date or primary_date = False
     other_time_cols   = [k['name'] for k in mapper['date'] if 'primary_date' not in k or k['primary_date'] == False]
+
+    # list of names of geo columns primary_geo=True
     primary_geo_cols  = [k["name"] for k in mapper["geo"]  if "primary_geo"  in k and k["primary_geo"] == True]
 
-    # dictionary for columns qualified by another column.
+    # list of geotypes of geo columns primary_geo=True (used for match_geo_names logic below)
+    primary_geo_types = [k["geo_type"] for k in mapper["geo"]  if "primary_geo"  in k and k["primary_geo"] == True]
+
+    # qualified_col_dict: dictionary for columns qualified by another column.
     # key: qualified column
     # value: list of columns that qualify key column
     qualified_col_dict = {}
@@ -841,11 +857,24 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
                 df["lng"] = longs
                 df["lat"] = lats
                 del df[kk]
-            elif geo_dict["geo_type"] == "country" and kk != "country":
+            elif geo_dict["geo_type"] == GEO_TYPE_COUNTRY and kk != "country":
                 # force the country column to be named country
                 staple_col_name = "country"
                 df.rename(columns={kk: staple_col_name}, inplace=True)
                 #renamed_col_dict[staple_col_name] = [kk] # 7/2/2021 do not include primary cols
+            elif geo_dict["geo_type"] == GEO_TYPE_ADMIN1 and kk != "admin1":
+                # force the country column to be named country
+                staple_col_name = "admin1"
+                df.rename(columns={kk: staple_col_name}, inplace=True)
+            elif geo_dict["geo_type"] == GEO_TYPE_ADMIN2 and kk != "admin2":
+                # force the country column to be named country
+                staple_col_name = "admin2"
+                df.rename(columns={kk: staple_col_name}, inplace=True)
+            elif geo_dict["geo_type"] == GEO_TYPE_ADMIN3 and kk != "admin2":
+                # force the country column to be named country
+                staple_col_name = "admin3"
+                df.rename(columns={kk: staple_col_name}, inplace=True)
+
             elif str(geo_dict["geo_type"]).lower() in ["iso2", "iso3"]:
                 # use the ISO2 or ISO3 column as country
 
@@ -879,19 +908,19 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
             # in the event there is no primary geo
             # otherwise they are features and we geocode lat/lng
             if len(primary_geo_cols) == 0:
-                if geo_dict["geo_type"] == "country":
+                if geo_dict["geo_type"] == GEO_TYPE_COUNTRY:
                     df["country"] = df[kk]
                     renamed_col_dict["country"] = [kk]
                     continue
-                if geo_dict["geo_type"] == "state/territory":
+                if geo_dict["geo_type"] == GEO_TYPE_ADMIN1:
                     df["admin1"] = df[kk]
                     renamed_col_dict["admin1"] = [kk]
                     continue
-                if geo_dict["geo_type"] == "county/district":
+                if geo_dict["geo_type"] == GEO_TYPE_ADMIN2:
                     df["admin2"] = df[kk]
                     renamed_col_dict["admin2"] = [kk]
                     continue
-                if geo_dict["geo_type"] == "municipality/town":
+                if geo_dict["geo_type"] == GEO_TYPE_ADMIN3:
                     df["admin3"] = df[kk]
                     renamed_col_dict["admin3"] = [kk]
                     continue
@@ -923,14 +952,18 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
     # perform geocoding if lat/lng are present
     if "lat" in df and "lng" in df:
         df = geocode(admin, df, x="lng", y="lat")
-    #elif "country" in df:
-    elif "country" in primary_geo_cols or ("country" in df and not primary_geo_cols):
+    elif "country" in primary_geo_types or ("country" in df and not primary_geo_types):
         # Correct any misspellings etc. in state and admin areas when not
         # geocoding lat and lng above, and country is the primary_geo.
-        # This don't match names if iso2/iso3 are primary, and when country
+        # This doesn't match names if iso2/iso3 are primary, and when country
         # admin1-3 are moved to features. Exception is when country is present,
         # but nothing is marked as primary.
-        df = match_geo_names(admin, df)
+
+        # Only geo_code resolve_to_gadm = True fields.
+        # Used below when match_geocode_names
+        resolve_to_gadm_geotypes = [k["geo_type"] for k in mapper["geo"]  if "resolve_to_gadm" in k and k["resolve_to_gadm"] == True]
+        if resolve_to_gadm_geotypes:
+            df = match_geo_names(admin, df, resolve_to_gadm_geotypes)
 
     df_geo_cols = [i for i in df.columns if 'mixmasta_geocoded' in i]
     for c in df_geo_cols:
@@ -1067,11 +1100,11 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True)
         df = raster2df(
             InRaster = fp,
             feature_name = transform["feature_name"],
-            band = int(transform["band"] if transform["band"] else "0"),
+            band = int(transform["band"] if "band" in transform and transform["band"] != "" else "0"),
             nodataval = int(transform["null_val"]),
             date = d,
             band_name = transform["band_name"],
-            bands = transform["bands"]
+            bands = transform["bands"] if "bands" in transform else None
         )
     elif ftype == 'excel':
         df = pd.read_excel(fp, transform['sheet'])
@@ -1191,7 +1224,7 @@ def raster2df(
         if band > 0 and band != x:
             continue
 
-        band_value = bands[str(x)]
+        band_value = bands[str(x)] if bands is not None else band_name
         rBand = ds.GetRasterBand(x)  # (band) # first band
         nData = rBand.GetNoDataValue()
 
@@ -1293,13 +1326,23 @@ def raster2df(
 #geo = 'admin2'
 #outf = 'tests/outputs/unittests'
 
+#fp = "examples/causemosify-tests/hoa_conflict.csv"
+#mp = "examples/causemosify-tests/hoa_conflict.json"
+#geo = 'admin2'
+#outf = 'examples/causemosify-tests'
+
+#fp = "examples/causemosify-tests/maxent_Ethiopia_precipChange.0.8tempChange.-0.3.tif"
+#mp = "examples/causemosify-tests/maxent_Ethiopia_precipChange.0.8tempChange.-0.3.json"
+#geo = 'admin2'
+#outf = 'examples/causemosify-tests'
+
 #start_time = timeit.default_timer()
 #df, dct = process(fp, mp,geo, outf)
 #print('process time', timeit.default_timer() - start_time)
 #cols = ['timestamp','country','admin1','admin2','admin3','lat','lng','feature','value']
 #df.sort_values(by=cols, inplace=True)
 #df.reset_index(drop=True, inplace=True)
-#df.to_csv("tests/outputs/test4_rainfall_error_output.csv", index = False)
+#df.to_csv("tests/outputs/test7_single_band_tif_output.csv", index = False)
 #print('\n', df.head())
 #print('\n', df.tail())
 #print('\n', df.shape)
