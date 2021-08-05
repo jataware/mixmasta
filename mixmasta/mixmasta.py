@@ -146,7 +146,7 @@ def format_time(t: str, time_format: str, validate: bool = True) -> int:
             return None
 
 def geocode(
-    admin: str, df: pd.DataFrame, x: str = "longitude", y: str = "latitude"
+    admin: str, df: pd.DataFrame, x: str = "longitude", y: str = "latitude", gadm: gpd.GeoDataFrame = None
 ) -> pd.DataFrame:
     """
     Description
@@ -165,6 +165,9 @@ def geocode(
         the name of the column containing longitude information
     y: str, default 'latitude'
         the name of the column containing latitude data
+    gadm: gpd.GeoDataFrame, default None
+        optional specification of a GeoDataFrame of GADM shapes of the appropriate
+        level (admin2/3) for geocoding
 
     Examples
     --------
@@ -181,42 +184,47 @@ def geocode(
     cdir = os.path.expanduser("~")
     download_data_folder = f"{cdir}/mixmasta_data"
 
-    if admin == 'admin0':
-        gadm_fn = f"gadm36_2.feather"
-        gadmDir = f"{download_data_folder}/{gadm_fn}"
-        gadm = gf.from_geofeather(gadmDir)
-        gadm["country"] = gadm["NAME_0"]
-        gadm = gadm[["geometry", "country"]]
+    # only load GADM if it wasn't explicitly passed to the function.
+    if gadm is not None:
+        logging.info("GADM geo dataframe has been provided.")
+    else:
+        logging.info("GADM has not been provided; loading now.")
+        if admin == 'admin0':
+            gadm_fn = f"gadm36_2.feather"
+            gadmDir = f"{download_data_folder}/{gadm_fn}"
+            gadm = gf.from_geofeather(gadmDir)
+            gadm["country"] = gadm["NAME_0"]
+            gadm = gadm[["geometry", "country"]]
 
-    elif admin == "admin1":
-        gadm_fn = f"gadm36_2.feather"
-        gadmDir = f"{download_data_folder}/{gadm_fn}"
-        gadm = gf.from_geofeather(gadmDir)
-        gadm["country"] = gadm["NAME_0"]
-        gadm["state"] = gadm["NAME_1"]
-        gadm["admin1"] = gadm["NAME_1"]
-        gadm = gadm[["geometry", "country", "state", "admin1"]]
+        elif admin == "admin1":
+            gadm_fn = f"gadm36_2.feather"
+            gadmDir = f"{download_data_folder}/{gadm_fn}"
+            gadm = gf.from_geofeather(gadmDir)
+            gadm["country"] = gadm["NAME_0"]
+            gadm["state"] = gadm["NAME_1"]
+            gadm["admin1"] = gadm["NAME_1"]
+            gadm = gadm[["geometry", "country", "state", "admin1"]]
 
-    elif admin == "admin2":
-        gadm_fn = f"gadm36_2.feather"
-        gadmDir = f"{download_data_folder}/{gadm_fn}"
-        gadm = gf.from_geofeather(gadmDir)
-        gadm["country"] = gadm["NAME_0"]
-        gadm["state"] = gadm["NAME_1"]
-        gadm["admin1"] = gadm["NAME_1"]
-        gadm["admin2"] = gadm["NAME_2"]
-        gadm = gadm[["geometry", "country", "state", "admin1", "admin2"]]
+        elif admin == "admin2":
+            gadm_fn = f"gadm36_2.feather"
+            gadmDir = f"{download_data_folder}/{gadm_fn}"
+            gadm = gf.from_geofeather(gadmDir)
+            gadm["country"] = gadm["NAME_0"]
+            gadm["state"] = gadm["NAME_1"]
+            gadm["admin1"] = gadm["NAME_1"]
+            gadm["admin2"] = gadm["NAME_2"]
+            gadm = gadm[["geometry", "country", "state", "admin1", "admin2"]]
 
-    elif admin == "admin3":
-        gadm_fn = f"gadm36_3.feather"
-        gadmDir = f"{download_data_folder}/{gadm_fn}"
-        gadm = gf.from_geofeather(gadmDir)
-        gadm["country"] = gadm["NAME_0"]
-        gadm["state"] = gadm["NAME_1"]
-        gadm["admin1"] = gadm["NAME_1"]
-        gadm["admin2"] = gadm["NAME_2"]
-        gadm["admin3"] = gadm["NAME_3"]
-        gadm = gadm[["geometry", "country", "state", "admin1", "admin2", "admin3"]]
+        elif admin == "admin3":
+            gadm_fn = f"gadm36_3.feather"
+            gadmDir = f"{download_data_folder}/{gadm_fn}"
+            gadm = gf.from_geofeather(gadmDir)
+            gadm["country"] = gadm["NAME_0"]
+            gadm["state"] = gadm["NAME_1"]
+            gadm["admin1"] = gadm["NAME_1"]
+            gadm["admin2"] = gadm["NAME_2"]
+            gadm["admin3"] = gadm["NAME_3"]
+            gadm = gadm[["geometry", "country", "state", "admin1", "admin2", "admin3"]]        
 
     df.loc[:, "geometry"] = df.apply(lambda row: Point(row[x], row[y]), axis=1)
 
@@ -598,7 +606,7 @@ def netcdf2df(netcdf: str) -> pd.DataFrame:
 
     return df
 
-def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dict):
+def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFrame = None) -> (pd.DataFrame, dict):
     """
     Description
     -----------
@@ -627,6 +635,9 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
         }
     admin: str, default 'admin2'
         the level to geocode to. Either 'admin2' or 'admin3'
+    gadm: gpd.GeoDataFrame, default None
+        optional specification of a GeoDataFrame of GADM shapes of the appropriate
+        level (admin2/3) for geocoding        
 
     Examples
     --------
@@ -951,7 +962,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str) -> (pd.DataFrame, dic
 
     # perform geocoding if lat/lng are present
     if "lat" in df and "lng" in df:
-        df = geocode(admin, df, x="lng", y="lat")
+        df = geocode(admin, df, x="lng", y="lat", gadm=gadm)
     elif "country" in primary_geo_types or ("country" in df and not primary_geo_types):
         # Correct any misspellings etc. in state and admin areas when not
         # geocoding lat and lng above, and country is the primary_geo.
@@ -1068,7 +1079,7 @@ def optimize_df_types(df: pd.DataFrame):
 
     return df
 
-def process(fp: str, mp: str, admin: str, output_file: str, write_output = True):
+def process(fp: str, mp: str, admin: str, output_file: str, write_output = True, gadm=None):
     """
     Parameters
     ----------
@@ -1076,7 +1087,10 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True)
         Filename for JSON mapper from spacetag.
         Schema: https://github.com/jataware/spacetag/blob/schema/schema.py
         Example: https://github.com/jataware/spacetag/blob/schema/example.json
-
+    
+    gadm: gpd.GeoDataFrame, default None
+        optional specification of a GeoDataFrame of GADM shapes of the appropriate
+        level (admin2/3) for geocoding
     """
 
     # Read JSON schema to be mapper.
@@ -1123,7 +1137,7 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True)
     df.reset_index(inplace=True, drop=True)
 
     ## Run normailizer.
-    norm, renamed_col_dict = normalizer(df, mapper, admin)
+    norm, renamed_col_dict = normalizer(df, mapper, admin, gadm=gadm)
 
     # Normalizer will add NaN for missing values, e.g. when appending
     # dataframes with different columns. GADM will return None when geocoding
@@ -1296,6 +1310,42 @@ def raster2df(
     df.sort_values(by=columns, inplace=True)
 
     return df
+
+class mixdata:
+    def load_gadm2(self):
+        cdir = os.path.expanduser("~")
+        download_data_folder = f"{cdir}/mixmasta_data"
+
+        # Admin 0 - 2
+        gadm_fn = f"gadm36_2.feather"
+        gadmDir = f"{download_data_folder}/{gadm_fn}"
+        gadm = gf.from_geofeather(gadmDir)
+        gadm["country"] = gadm["NAME_0"]
+        gadm["state"] = gadm["NAME_1"]
+        gadm["admin1"] = gadm["NAME_1"]
+        gadm["admin2"] = gadm["NAME_2"]    
+        gadm0 = gadm[["geometry", "country"]]
+        gadm1 = gadm[["geometry", "country", "state", "admin1"]]
+        gadm2 = gadm[["geometry", "country", "state", "admin1", "admin2"]]
+        self.gadm0 = gadm0
+        self.gadm1 = gadm1
+        self.gadm2 = gadm2
+
+    def load_gadm3(self):
+        # Admin 3
+        cdir = os.path.expanduser("~")
+        download_data_folder = f"{cdir}/mixmasta_data"        
+        gadm_fn = f"gadm36_3.feather"
+        gadmDir = f"{download_data_folder}/{gadm_fn}"
+        gadm3 = gf.from_geofeather(gadmDir)
+        gadm3["country"] = gadm3["NAME_0"]
+        gadm3["state"] = gadm3["NAME_1"]
+        gadm3["admin1"] = gadm3["NAME_1"]
+        gadm3["admin2"] = gadm3["NAME_2"]
+        gadm3["admin3"] = gadm3["NAME_3"]
+        gadm3 = gadm3[["geometry", "country", "state", "admin1", "admin2", "admin3"]]
+        self.gadm3 = gadm3
+        
 
 # Testing
 
