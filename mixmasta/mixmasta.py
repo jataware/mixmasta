@@ -165,6 +165,9 @@ def geocode(
         the name of the column containing longitude information
     y: str, default 'latitude'
         the name of the column containing latitude data
+    gadm: gpd.GeoDataFrame, default None
+        optional specification of a GeoDataFrame of GADM shapes of the appropriate
+        level (admin2/3) for geocoding
 
     Examples
     --------
@@ -632,6 +635,9 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
         }
     admin: str, default 'admin2'
         the level to geocode to. Either 'admin2' or 'admin3'
+    gadm: gpd.GeoDataFrame, default None
+        optional specification of a GeoDataFrame of GADM shapes of the appropriate
+        level (admin2/3) for geocoding        
 
     Examples
     --------
@@ -1081,7 +1087,10 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True,
         Filename for JSON mapper from spacetag.
         Schema: https://github.com/jataware/spacetag/blob/schema/schema.py
         Example: https://github.com/jataware/spacetag/blob/schema/example.json
-
+    
+    gadm: gpd.GeoDataFrame, default None
+        optional specification of a GeoDataFrame of GADM shapes of the appropriate
+        level (admin2/3) for geocoding
     """
 
     # Read JSON schema to be mapper.
