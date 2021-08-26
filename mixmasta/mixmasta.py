@@ -535,7 +535,7 @@ def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list
         gadm_country_list = gadm["country"].unique()
         unknowns = df[~df.country.isin(gadm_country_list)].country.tolist()
         for unk in unknowns:
-            match = fuzzywuzzy.process.extractOne(unk, gadm_country_list, scorer=fuzz.ratio)
+            match = fuzzywuzzy.process.extractOne(unk, gadm_country_list, scorer=fuzz.partial_ratio)
             if match != None:
                 df.loc[df.country == unk, 'country'] = match[0]
 
@@ -554,7 +554,7 @@ def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list
                 unknowns = df[(df.country == c) & ~df.admin1.isin(admin1_list)].admin1.tolist()
                 unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
                 for unk in unknowns:
-                    match = fuzzywuzzy.process.extractOne(unk, admin1_list, scorer=fuzz.ratio)
+                    match = fuzzywuzzy.process.extractOne(unk, admin1_list, scorer=fuzz.partial_ratio)
                     if match != None:
                         df.loc[df.admin1 == unk, 'admin1'] = match[0]
 
@@ -565,7 +565,7 @@ def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list
                 unknowns = df[(df.country == c) & ~df.admin2.isin(admin2_list)].admin2.tolist()
                 unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
                 for unk in unknowns:
-                    match = fuzzywuzzy.process.extractOne(unk, admin2_list, scorer=fuzz.ratio)
+                    match = fuzzywuzzy.process.extractOne(unk, admin2_list, scorer=fuzz.partial_ratio)
                     if match != None:
                         df.loc[df.admin2 == unk, 'admin2'] = match[0]
 
@@ -576,7 +576,7 @@ def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list
                 unknowns = df[(df.country == c) & ~df.admin3.isin(admin3_list)].admin3.tolist()
                 unknowns = [x for x in unknowns if pd.notnull(x) and x.strip()] # remove Nan
                 for unk in unknowns:
-                    match = fuzzywuzzy.process.extractOne(unk, admin3_list, scorer=fuzz.ratio)
+                    match = fuzzywuzzy.process.extractOne(unk, admin3_list, scorer=fuzz.partial_ratio)
                     if match != None:
                         df.loc[df.admin3 == unk, 'admin3'] = match[0]
 
