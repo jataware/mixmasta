@@ -6,6 +6,7 @@ import sys
 from datetime import datetime
 from typing import List
 
+
 import geofeather as gf
 import geopandas as gpd
 import numpy as np
@@ -694,6 +695,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
     features = []
     primary_date_group_mapper = {}
     other_date_group_mapper = {}
+    renamed_col_dict = {}
 
     for date_dict in mapper["date"]:
         kk = date_dict["name"]
@@ -1205,6 +1207,9 @@ def raster2df(
         date associated with the raster (if any)
     band_name: str, default feature2
         the name of the band data e.g. head_count, flooding
+    bands: dict, default None
+        passed in meta; dictionary of band identifiers and specifies bands to 
+        be processed.
 
     Examples
     --------
@@ -1238,7 +1243,15 @@ def raster2df(
         if band > 0 and band != x:
             continue
 
-        band_value = bands[str(x)] if bands is not None else band_name
+        # If no bands in meta, then single-band and use band_name
+        # If bands, then process only those in the meta.
+        if bands == None:
+            band_value = band_name
+        elif str(x) in bands:
+            band_value = bands[str(x)] 
+        else:
+            continue
+                
         rBand = ds.GetRasterBand(x)  # (band) # first band
         nData = rBand.GetNoDataValue()
 
