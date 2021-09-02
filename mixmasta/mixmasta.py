@@ -695,7 +695,6 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
     features = []
     primary_date_group_mapper = {}
     other_date_group_mapper = {}
-    renamed_col_dict = {}
 
     for date_dict in mapper["date"]:
         kk = date_dict["name"]
