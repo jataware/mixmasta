@@ -57,35 +57,70 @@ def causemosify_multi(inputs, geo, output_file):
     # "[{\"input_file\": \"build-a-date-qualifier_*.csv\",
     #        \"mapper\": \"build-a-date-qualifier.json\"}]"
 
-    input_array = json.loads(inputs)
-
-    df = pd.DataFrame()
+    input_array = json.loads(inputs)   
     renamed_col_dict = {}
+    temp_df_paths = []
+    temp_df_str_paths = []
+    df = pd.DataFrame()
     for item in input_array:
         # Handle filename wildcards.
         input_file =  glob_input_file(item["input_file"])
+        
+        # Assign mapper.
         mapper = item["mapper"]
 
         # Call process without writing parquet files.
-        result_df, result_dict = process(input_file, mapper, geo, output_file = None, write_output=False)
+        df, result_dict = process(input_file, mapper, geo, output_file = None, write_output=False)
 
-        # Combine outputs to return single file.
-        df = result_df if df.empty else df.append(result_df)
+        # Combine dict to return single file.
         renamed_col_dict = result_dict if not renamed_col_dict else {**renamed_col_dict, **result_dict}
 
-    # Separate string values from others
-    df['type'] = df[['value']].applymap(type)
-    df_str = df[df['type']==str]
-    df = df[df['type']!=str]
-    del(df_str['type'])
-    del(df['type'])
 
-    # Write parquet files
+        # Write dataframes to file instead of leaving in memory.
+        unused, input_filename = os.path.split(input_file)
+
+        ## Separate string values from others.
+        df['type'] = df[['value']].applymap(type)
+        df_str = df[df['type']==str]
+        df = df[df['type']!=str]
+        del(df_str['type'])
+        del(df['type'])
+
+        ## Write separate parquet files. Write/read .csv results in wierd dtypes.
+        df.to_parquet(f"{input_filename}.parquet.gzip", compression="gzip")
+        temp_df_paths.append(f"{input_filename}.parquet.gzip")
+        if len(df_str) > 0:
+            df_str.to_parquet(f"{input_filename}_str.parquet.gzip", compression="gzip")
+            temp_df_str_paths.append(f"{input_filename}_str.parquet.gzip")
+
+
+    # Reassemble tmp files into a single (massive probably) df.
+    df = pd.DataFrame()
+    for temp_df_path in temp_df_paths:
+        # Read the temp df saved as a parquet.
+        temp_df = pd.read_parquet(temp_df_path)
+        # Append or assign to df.
+        df = temp_df if df.empty else df.append(temp_df)
+        # Remove the tmp file.
+        os.remove(temp_df_path)
+
+    # Do the same for any str parquets
+    df_str = pd.DataFrame()
+    for temp_df_str_path in temp_df_str_paths:
+        # Read the temp df saved as a parquet.
+        temp_df = pd.read_parquet(temp_df_str_path)
+        # Append or assign to df.
+        df_str = temp_df if df_str.empty else df_str.append(temp_df)
+        # Remove the tmp file.
+        os.remove(temp_df_str_path)
+
+    # Write separate parquet files.
     df.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
-    if len(df_str) > 0:
+    if not df_str.empty:
         df_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
-
+    
     return df.append(df_str), renamed_col_dict
+
 
 @cli.command()
 @click.option("--xform", type=str, default=None)
@@ -157,5 +192,5 @@ def download():
     download_and_clean("admin3")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
     cli()

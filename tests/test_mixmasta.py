@@ -8,7 +8,7 @@ import warnings
 
 from click.testing import CliRunner
 import subprocess
-
+import logging
 import json
 from mixmasta import cli, mixmasta
 from pandas.util.testing import assert_frame_equal, assert_dict_equal
@@ -20,6 +20,8 @@ if os.name == 'nt':
     sep = '\\'
 else:
     sep = '/'
+
+logger = logging.getLogger(__name__)
 
 class TestMixmaster(unittest.TestCase):
     """Tests for `mixmasta` package."""
@@ -229,7 +231,10 @@ class TestMixmaster(unittest.TestCase):
         inputs = "--inputs=[{\"input_file\": \"inputs" + f"{sep}test1_input.csv\",\"mapper\": \"inputs{sep}test1_input.json\"" + "},{\"input_file\": \""
         inputs = inputs + f"inputs{sep}test3_qualifies.csv\",\"mapper\": \"inputs{sep}test3_qualifies.json\"" + "}]"
         result = subprocess.run(['mixmasta', "causemosify-multi", inputs, "--geo=admin2", f"--output-file=outputs{sep}unittests"], capture_output=True, encoding='utf-8')
+        if (result.returncode != 0):
+            print(result)
         self.assertEqual(result.returncode, 0)
+        
 
         ## Compare parquet file.
         df = pd.read_parquet(f"outputs{sep}unittests.parquet.gzip")
@@ -241,6 +246,9 @@ class TestMixmaster(unittest.TestCase):
         output_df.sort_values(by=cols, inplace=True)
         df.reset_index(drop=True, inplace=True)
         output_df.reset_index(drop =True, inplace=True)
+
+        logger.info(df.shape)
+        logger.info(output_df.shape)
 
         # Assertion
         assert_frame_equal(df, output_df, check_categorical = False)

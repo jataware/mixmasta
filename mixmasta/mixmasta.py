@@ -11,6 +11,7 @@ import geofeather as gf
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+from pandas.core.frame import DataFrame
 import requests
 import xarray as xr
 from osgeo import gdal, gdalconst
@@ -190,6 +191,7 @@ def geocode(
         logging.info("GADM geo dataframe has been provided.")
     else:
         logging.info("GADM has not been provided; loading now.")
+        print("GADM has not been provided; loading now.")
         if admin == 'admin0':
             gadm_fn = f"gadm36_2.feather"
             gadmDir = f"{download_data_folder}/{gadm_fn}"
@@ -502,6 +504,7 @@ def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list
     A pandas.Dataframe produced by modifying the parameter df.
 
     """
+    print('geocoding ...')
     flag = speedups.available
     if flag == True:
         speedups.enable()
@@ -597,7 +600,8 @@ def netcdf2df(netcdf: str) -> pd.DataFrame:
     DataFrame
         The resultant dataframe
     """
-    try:
+    try:        
+        #import netCDF4 as nc
         ds = xr.open_dataset(netcdf)
     except:
         raise AssertionError(f"improperly formatted netCDF file ({netcdf})")
@@ -1128,6 +1132,8 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True,
     else:
         df = pd.read_csv(fp)
 
+    #print('df info memory\n', df.info(memory_usage='deep'))
+
     ## Make mapper contain only keys for date, geo, and feature.
     mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
 
@@ -1137,6 +1143,28 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True,
     df = optimize_df_types(df)
     df.reset_index(inplace=True, drop=True)
 
+    """
+    # --------- new
+    df_array = np.array_split(df, 3)
+    norm = DataFrame()
+    renamed_col_dict = {}
+
+    for df_a in df_array:
+        df_norm, df_renamed_col_dict = normalizer(df_a, mapper, admin, gadm=gadm)
+            
+        norm = df_norm if norm.empty else norm.append(df_norm, ignore_index=True)
+        renamed_col_dict.update(df_renamed_col_dict)
+
+
+    cols = ['timestamp','country','admin1','admin2','admin3','lat','lng','feature','value']
+    norm.sort_values(by=cols, inplace=True)
+    norm.reset_index(drop=True, inplace=True)
+    print('norm.shape: ', norm.shape)
+    print(norm.head())
+    print(norm.tail())
+
+    # --------- end new
+    """
     ## Run normailizer.
     norm, renamed_col_dict = normalizer(df, mapper, admin, gadm=gadm)
 
@@ -1281,6 +1309,7 @@ def raster2df(
                 nData = np.float16(nData)
 
         points = []
+      
         for ThisRow in RowRange:
             RowData = rBand.ReadAsArray(0, ThisRow, ds.RasterXSize, 1)[0]
             for ThisCol in ColRange:
@@ -1395,10 +1424,14 @@ class mixdata:
 
 #fp = "examples/causemosify-tests/maxent_Ethiopia_precipChange.0.8tempChange.-0.3.tif"
 #mp = "examples/causemosify-tests/maxent_Ethiopia_precipChange.0.8tempChange.-0.3.json"
+
+#fp = 'examples/causemosify-tests/SouthSudan_2017_Apr_hires_masked_malnut.tiff'
+#mp = 'examples/causemosify-tests/SouthSudan_2017_Apr_hires_masked_malnut.json'
 #geo = 'admin2'
 #outf = 'examples/causemosify-tests'
 
 #start_time = timeit.default_timer()
+#df = pd.DataFrame()
 #df, dct = process(fp, mp,geo, outf)
 #print('process time', timeit.default_timer() - start_time)
 #cols = ['timestamp','country','admin1','admin2','admin3','lat','lng','feature','value']
