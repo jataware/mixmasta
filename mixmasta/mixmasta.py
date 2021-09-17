@@ -27,6 +27,8 @@ from fuzzywuzzy import process
 import timeit
 #from .spacetag_schema import SpaceModel
 
+import click
+
 # Constants
 COL_ORDER = [
         "timestamp",
@@ -191,7 +193,7 @@ def geocode(
         logging.info("GADM geo dataframe has been provided.")
     else:
         logging.info("GADM has not been provided; loading now.")
-        print("GADM has not been provided; loading now.")
+
         if admin == 'admin0':
             gadm_fn = f"gadm36_2.feather"
             gadmDir = f"{download_data_folder}/{gadm_fn}"
@@ -483,7 +485,7 @@ def handle_colname_collisions(df: pd.DataFrame, mapper: dict, protected_cols: li
 
     return df, mapper, renamed_col_dict
 
-def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list) -> pd.DataFrame:
+def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list, gadm: gpd.GeoDataFrame = None) -> pd.DataFrame:
     """
     Assumption
     ----------
@@ -498,6 +500,9 @@ def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list
         the uploaded dataframe
     resolve_to_gadm_geotypes:
         list of geotypes marked resolve_to_gadm = True e.g. ["admin1", "country"]
+    gadm: gpd.GeoDataFrame, default None
+        optional specification of a GeoDataFrame of GADM shapes of the appropriate
+        level (admin2/3) for geocoding
 
     Result
     ------
@@ -512,24 +517,31 @@ def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list
     cdir = os.path.expanduser("~")
     download_data_folder = f"{cdir}/mixmasta_data"
 
-    if admin == "admin2":
-        gadm_fn = f"gadm36_2.feather"
+    # only load GADM if it wasn't explicitly passed to the function.
+    if gadm is not None:
+        #logging.info("GADM geo dataframe has been provided.")
+        pass
     else:
-        gadm_fn = f"gadm36_3.feather"
+        logging.info("GADM has not been provided; loading now.")
 
-    gadmDir = f"{download_data_folder}/{gadm_fn}"
-    gadm = gf.from_geofeather(gadmDir)
+        if admin == "admin2":
+            gadm_fn = f"gadm36_2.feather"
+        else:
+            gadm_fn = f"gadm36_3.feather"
 
-    gadm["country"] = gadm["NAME_0"]
-    gadm["state"]   = gadm["NAME_1"]
-    gadm["admin1"]  = gadm["NAME_1"]
-    gadm["admin2"]  = gadm["NAME_2"]
+        gadmDir = f"{download_data_folder}/{gadm_fn}"
+        gadm = gf.from_geofeather(gadmDir)
 
-    if admin == "admin2":
-        gadm = gadm[["country", "state", "admin1", "admin2"]]
-    else:
-        gadm["admin3"] = gadm["NAME_3"]
-        gadm = gadm[["country", "state", "admin1", "admin2", "admin3"]]
+        gadm["country"] = gadm["NAME_0"]
+        gadm["state"]   = gadm["NAME_1"]
+        gadm["admin1"]  = gadm["NAME_1"]
+        gadm["admin2"]  = gadm["NAME_2"]
+
+        if admin == "admin2":
+            gadm = gadm[["country", "state", "admin1", "admin2"]]
+        else:
+            gadm["admin3"] = gadm["NAME_3"]
+            gadm = gadm[["country", "state", "admin1", "admin2", "admin3"]]
 
     # Filter GADM for countries in df.
     countries = df["country"].unique()
@@ -941,6 +953,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
                     continue
             features.append(kk)
 
+
     # Append columns annotated in feature dict to features list (if not a
     # qualifies column)
     #features.extend([k["name"] for k in mapper["feature"]])
@@ -1057,7 +1070,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
 
     # Handle any renamed cols being renamed.
     renamed_col_dict = audit_renamed_col_dict(renamed_col_dict)
-
+    
     return df_out[col_order], renamed_col_dict
 
 def optimize_df_types(df: pd.DataFrame):
@@ -1140,7 +1153,7 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True,
     df = optimize_df_types(df)
     df.reset_index(inplace=True, drop=True)
 
-    ## Run normailizer.
+    ## Run normalizer.
     norm, renamed_col_dict = normalizer(df, mapper, admin, gadm=gadm)
 
     # Normalizer will add NaN for missing values, e.g. when appending
