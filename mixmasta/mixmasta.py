@@ -11,6 +11,7 @@ import geofeather as gf
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+from pandas.core.frame import DataFrame
 import requests
 import xarray as xr
 from osgeo import gdal, gdalconst
@@ -25,6 +26,8 @@ from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 import timeit
 #from .spacetag_schema import SpaceModel
+
+import click
 
 # Constants
 COL_ORDER = [
@@ -147,34 +150,37 @@ def format_time(t: str, time_format: str, validate: bool = True) -> int:
             return None
 
 def geocode(
-    admin: str, df: pd.DataFrame, x: str = "longitude", y: str = "latitude", gadm: gpd.GeoDataFrame = None
+    admin: str, df: pd.DataFrame, x: str = "longitude", y: str = "latitude", gadm: gpd.GeoDataFrame = None,
+    df_geocode: pd.DataFrame = pd.DataFrame()
 ) -> pd.DataFrame:
     """
-    Description
-    -----------
-    Takes a dataframe containing coordinate data and geocodes it to GADM (https://gadm.org/)
+        Description
+        -----------
+        Takes a dataframe containing coordinate data and geocodes it to GADM (https://gadm.org/)
 
-    GEOCODES to ADMIN 0, 1, 2 OR 3 LEVEL
+        GEOCODES to ADMIN 0, 1, 2 OR 3 LEVEL
 
-    Parameters
-    ----------
-    admin: str
-        the level to geocode to. 'admin0' to 'admin3'
-    df: pd.DataFrame
-        a pandas dataframe containing point data
-    x: str, default 'longitude'
-        the name of the column containing longitude information
-    y: str, default 'latitude'
-        the name of the column containing latitude data
-    gadm: gpd.GeoDataFrame, default None
-        optional specification of a GeoDataFrame of GADM shapes of the appropriate
-        level (admin2/3) for geocoding
+        Parameters
+        ----------
+        admin: str
+            the level to geocode to. 'admin0' to 'admin3'
+        df: pd.DataFrame
+            a pandas dataframe containing point data
+        x: str, default 'longitude'
+            the name of the column containing longitude information
+        y: str, default 'latitude'
+            the name of the column containing latitude data
+        gadm: gpd.GeoDataFrame, default None
+            optional specification of a GeoDataFrame of GADM shapes of the appropriate
+            level (admin2/3) for geocoding
+        df_geocode: pd.DataFrame, default pd.DataFrame()
+            cached lat/long geocode library
 
-    Examples
-    --------
-    Geocoding a dataframe with columns named 'lat' and 'lon'
+        Examples
+        --------
+        Geocoding a dataframe with columns named 'lat' and 'lon'
 
-    >>> df = geocode(df, x='lon', y='lat')
+        >>> df = geocode(df, x='lon', y='lat')
 
     """
 
@@ -185,11 +191,12 @@ def geocode(
     cdir = os.path.expanduser("~")
     download_data_folder = f"{cdir}/mixmasta_data"
 
-    # only load GADM if it wasn't explicitly passed to the function.
+    # Only load GADM if it wasn't explicitly passed to the function.
     if gadm is not None:
         logging.info("GADM geo dataframe has been provided.")
     else:
         logging.info("GADM has not been provided; loading now.")
+
         if admin == 'admin0':
             gadm_fn = f"gadm36_2.feather"
             gadmDir = f"{download_data_folder}/{gadm_fn}"
@@ -227,16 +234,42 @@ def geocode(
             gadm["admin3"] = gadm["NAME_3"]
             gadm = gadm[["geometry", "country", "state", "admin1", "admin2", "admin3"]]        
 
-    df.loc[:, "geometry"] = df.apply(lambda row: Point(row[x], row[y]), axis=1)
+    start_time = timeit.default_timer()
 
-    gdf = gpd.GeoDataFrame(df)
+    # 1) Drop x,y duplicates from data frame.
+    df_drop_dup_geo = df[[x,y]].drop_duplicates(subset=[x,y])
+    
+    # 2) Get x,y not in df_geocode.
+    if not df_geocode.empty and not df_drop_dup_geo.empty:
+        df_drop_dup_geo = df_drop_dup_geo.merge(df_geocode, on=[x,y], how='left', indicator=True)
+        df_drop_dup_geo = df_drop_dup_geo[ df_drop_dup_geo['_merge'] == 'left_only']
+        df_drop_dup_geo = df_drop_dup_geo[[x,y]]
 
-    # Spatial merge on GADM to obtain admin areas
-    gdf = gpd.sjoin(gdf, gadm, how="left", op="within", lsuffix="mixmasta_left", rsuffix="mixmasta_geocoded")
-    del gdf["geometry"]
-    del gdf["index_mixmasta_geocoded"]
+    if not df_drop_dup_geo.empty:
+        # dr_drop_dup_geo contains x,y not in df_geocode; so, these need to be
+        # geocoded and added to the df_geocode library.
 
-    return pd.DataFrame(gdf)
+        # 3) Apply Point() to create the geometry col.
+        df_drop_dup_geo.loc[:, "geometry"] = df_drop_dup_geo.apply(lambda row: Point(row[x], row[y]), axis=1) 
+
+        # 4) Sjoin unique geometries with GADM.
+        gdf = gpd.GeoDataFrame(df_drop_dup_geo)
+        
+        # Spatial merge on GADM to obtain admin areas.
+        gdf = gpd.sjoin(gdf, gadm, how="left", op="within", lsuffix="mixmasta_left", rsuffix="mixmasta_geocoded")
+        del gdf["geometry"]
+        del gdf["index_mixmasta_geocoded"]
+
+        # 5) Add the new geocoding to the df_geocode lat/long geocode library.
+        if not df_geocode.empty:
+            df_geocode = df_geocode.append(gdf)
+        else:
+            df_geocode = gdf
+
+    # 6) Merge df and df_geocode on x,y
+    gdf = df.merge(df_geocode, how='left', on=[x,y])
+
+    return pd.DataFrame(gdf), df_geocode
 
 def generate_column_name(field_list: list) -> str:
     """
@@ -481,7 +514,7 @@ def handle_colname_collisions(df: pd.DataFrame, mapper: dict, protected_cols: li
 
     return df, mapper, renamed_col_dict
 
-def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list) -> pd.DataFrame:
+def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list, gadm: gpd.GeoDataFrame = None) -> pd.DataFrame:
     """
     Assumption
     ----------
@@ -496,12 +529,16 @@ def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list
         the uploaded dataframe
     resolve_to_gadm_geotypes:
         list of geotypes marked resolve_to_gadm = True e.g. ["admin1", "country"]
+    gadm: gpd.GeoDataFrame, default None
+        optional specification of a GeoDataFrame of GADM shapes of the appropriate
+        level (admin2/3) for geocoding
 
     Result
     ------
     A pandas.Dataframe produced by modifying the parameter df.
 
     """
+    print('geocoding ...')
     flag = speedups.available
     if flag == True:
         speedups.enable()
@@ -509,24 +546,31 @@ def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list
     cdir = os.path.expanduser("~")
     download_data_folder = f"{cdir}/mixmasta_data"
 
-    if admin == "admin2":
-        gadm_fn = f"gadm36_2.feather"
+    # only load GADM if it wasn't explicitly passed to the function.
+    if gadm is not None:
+        #logging.info("GADM geo dataframe has been provided.")
+        pass
     else:
-        gadm_fn = f"gadm36_3.feather"
+        logging.info("GADM has not been provided; loading now.")
 
-    gadmDir = f"{download_data_folder}/{gadm_fn}"
-    gadm = gf.from_geofeather(gadmDir)
+        if admin == "admin2":
+            gadm_fn = f"gadm36_2.feather"
+        else:
+            gadm_fn = f"gadm36_3.feather"
 
-    gadm["country"] = gadm["NAME_0"]
-    gadm["state"]   = gadm["NAME_1"]
-    gadm["admin1"]  = gadm["NAME_1"]
-    gadm["admin2"]  = gadm["NAME_2"]
+        gadmDir = f"{download_data_folder}/{gadm_fn}"
+        gadm = gf.from_geofeather(gadmDir)
 
-    if admin == "admin2":
-        gadm = gadm[["country", "state", "admin1", "admin2"]]
-    else:
-        gadm["admin3"] = gadm["NAME_3"]
-        gadm = gadm[["country", "state", "admin1", "admin2", "admin3"]]
+        gadm["country"] = gadm["NAME_0"]
+        gadm["state"]   = gadm["NAME_1"]
+        gadm["admin1"]  = gadm["NAME_1"]
+        gadm["admin2"]  = gadm["NAME_2"]
+
+        if admin == "admin2":
+            gadm = gadm[["country", "state", "admin1", "admin2"]]
+        else:
+            gadm["admin3"] = gadm["NAME_3"]
+            gadm = gadm[["country", "state", "admin1", "admin2", "admin3"]]
 
     # Filter GADM for countries in df.
     countries = df["country"].unique()
@@ -597,7 +641,7 @@ def netcdf2df(netcdf: str) -> pd.DataFrame:
     DataFrame
         The resultant dataframe
     """
-    try:
+    try:        
         ds = xr.open_dataset(netcdf)
     except:
         raise AssertionError(f"improperly formatted netCDF file ({netcdf})")
@@ -607,7 +651,7 @@ def netcdf2df(netcdf: str) -> pd.DataFrame:
 
     return df
 
-def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFrame = None) -> (pd.DataFrame, dict):
+def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFrame = None, df_geocode: pd.DataFrame = pd.DataFrame()) -> (pd.DataFrame, dict, pd.DataFrame):
     """
     Description
     -----------
@@ -639,6 +683,14 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
     gadm: gpd.GeoDataFrame, default None
         optional specification of a GeoDataFrame of GADM shapes of the appropriate
         level (admin2/3) for geocoding        
+    df_gecode: pd.DataFrame, default pd.DataFrame()
+        lat,long geocode lookup library
+
+    Returns
+    -------
+    pd.DataFrame: CauseMos compliant format ready to be written to parquet.
+    dict: dictionary of modified column names; used by SpaceTag
+    pd.DataFRame: update lat,long geocode looup library
 
     Examples
     --------
@@ -938,6 +990,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
                     continue
             features.append(kk)
 
+
     # Append columns annotated in feature dict to features list (if not a
     # qualifies column)
     #features.extend([k["name"] for k in mapper["feature"]])
@@ -963,7 +1016,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
 
     # perform geocoding if lat/lng are present
     if "lat" in df and "lng" in df:
-        df = geocode(admin, df, x="lng", y="lat", gadm=gadm)
+        df, df_geocode = geocode(admin, df, x="lng", y="lat", gadm=gadm, df_geocode=df_geocode)
     elif "country" in primary_geo_types or ("country" in df and not primary_geo_types):
         # Correct any misspellings etc. in state and admin areas when not
         # geocoding lat and lng above, and country is the primary_geo.
@@ -1052,10 +1105,13 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
         if c not in df_out:
             df_out[c] = None
 
+    # Drop rows with nulls in value column.
+    df_out.dropna(axis=0, subset=['value'], inplace=True)
+
     # Handle any renamed cols being renamed.
     renamed_col_dict = audit_renamed_col_dict(renamed_col_dict)
-
-    return df_out[col_order], renamed_col_dict
+    
+    return df_out[col_order], renamed_col_dict, df_geocode
 
 def optimize_df_types(df: pd.DataFrame):
     """
@@ -1137,8 +1193,8 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True,
     df = optimize_df_types(df)
     df.reset_index(inplace=True, drop=True)
 
-    ## Run normailizer.
-    norm, renamed_col_dict = normalizer(df, mapper, admin, gadm=gadm)
+    ## Run normalizer.
+    norm, renamed_col_dict, df_geocode = normalizer(df, mapper, admin, gadm=gadm)
 
     # Normalizer will add NaN for missing values, e.g. when appending
     # dataframes with different columns. GADM will return None when geocoding
@@ -1281,6 +1337,7 @@ def raster2df(
                 nData = np.float16(nData)
 
         points = []
+      
         for ThisRow in RowRange:
             RowData = rBand.ReadAsArray(0, ThisRow, ds.RasterXSize, 1)[0]
             for ThisCol in ColRange:
@@ -1395,10 +1452,14 @@ class mixdata:
 
 #fp = "examples/causemosify-tests/maxent_Ethiopia_precipChange.0.8tempChange.-0.3.tif"
 #mp = "examples/causemosify-tests/maxent_Ethiopia_precipChange.0.8tempChange.-0.3.json"
+
+#fp = 'examples/causemosify-tests/SouthSudan_2017_Apr_hires_masked_malnut.tiff'
+#mp = 'examples/causemosify-tests/SouthSudan_2017_Apr_hires_masked_malnut.json'
 #geo = 'admin2'
 #outf = 'examples/causemosify-tests'
 
 #start_time = timeit.default_timer()
+#df = pd.DataFrame()
 #df, dct = process(fp, mp,geo, outf)
 #print('process time', timeit.default_timer() - start_time)
 #cols = ['timestamp','country','admin1','admin2','admin3','lat','lng','feature','value']
