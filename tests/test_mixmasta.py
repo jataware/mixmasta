@@ -236,8 +236,10 @@ class TestMixmaster(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         
 
-        ## Compare parquet file.
-        df = pd.read_parquet(f"outputs{sep}unittests.parquet.gzip")
+        ## Compare parquet files.
+        df1 = pd.read_parquet(f"outputs{sep}unittests.1.parquet.gzip")
+        df2 = pd.read_parquet(f"outputs{sep}unittests.2.parquet.gzip")
+        df = df1.append(df2)
         output_df = pd.read_parquet(f"outputs{sep}test5.parquet.gzip")
 
         # Sort both data frames and reindex for comparison,.
@@ -254,7 +256,7 @@ class TestMixmaster(unittest.TestCase):
         assert_frame_equal(df, output_df, check_categorical = False)
 
         ## Compare str.parquet file.
-        df = pd.read_parquet(f"outputs{sep}unittests_str.parquet.gzip")
+        df = pd.read_parquet(f"outputs{sep}unittests_str.2.parquet.gzip")
         output_df = pd.read_parquet(f"outputs{sep}test5_str.parquet.gzip")
 
         # Sort both data frames and reindex for comparison,.
