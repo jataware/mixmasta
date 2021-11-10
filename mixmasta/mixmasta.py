@@ -777,6 +777,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
                 # column_name meaning is not lost.
                 if not primary_time_cols and not "timestamp" in df.columns:
                     df.rename(columns={kk: "timestamp"}, inplace=True)
+                    staple_col_name ="timestamp"
                     renamed_col_dict[ staple_col_name ] = [kk]
                 # All not primary_time, not associated_columns fields are pushed to features.
                 features.append(kk)
