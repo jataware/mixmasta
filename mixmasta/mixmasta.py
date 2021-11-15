@@ -197,7 +197,7 @@ def geocode(
     else:
         logging.info("GADM has not been provided; loading now.")
 
-        if admin == 'admin0':
+        if admin in ['admin0','country']:
             gadm_fn = f"gadm36_2.feather"
             gadmDir = f"{download_data_folder}/{gadm_fn}"
             gadm = gf.from_geofeather(gadmDir)
@@ -1161,6 +1161,10 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True,
 
     # "meta" portion of schema specifies transformation type
     transform = mapper["meta"]
+
+    # Checker transform for meta.geocode_level. Update admin to this if present.
+    if "geocode_level" in transform:
+        admin = transform["geocode_level"]
 
     ftype = transform["ftype"]
     if ftype == "geotiff":
