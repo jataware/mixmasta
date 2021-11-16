@@ -207,7 +207,7 @@ def causemosify(input_file, mapper, geo: str = None, output_file: str = "mixmast
         if "geocode_level" in transform:
             geo = transform["geocode_level"]
         else:
-            click.echo("No geo specified and no meta.geocode_level in mapper.json. Defaulting to admin3.")
+            click.echo("No geo specified and no meta.geocode_level in mapper.json. Defaulting to admin2.")
             geo = "admin2"
 
     gadm = get_gadm(geo)
@@ -305,7 +305,7 @@ def causemosify_multi(inputs, geo: str = None, output_file: str = "mixmasta_outp
 
                 last_geo = loop_geo
             else:
-                click.echo("No geo specified and no meta.geocode_level in mapper.json. Defaulting to admin3.")
+                click.echo("No geo specified and no meta.geocode_level in mapper.json. Defaulting to admin2.")
                 loop_geo = "admin2"
 
                 if (loop_geo != last_geo or gadm.empty):
