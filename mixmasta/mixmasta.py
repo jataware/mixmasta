@@ -209,30 +209,33 @@ def geocode(
             gadmDir = f"{download_data_folder}/{gadm_fn}"
             gadm = gf.from_geofeather(gadmDir)
             gadm["country"] = gadm["NAME_0"]
-            gadm["state"] = gadm["NAME_1"]
+            #gadm["state"] = gadm["NAME_1"]
             gadm["admin1"] = gadm["NAME_1"]
-            gadm = gadm[["geometry", "country", "state", "admin1"]]
+            #gadm = gadm[["geometry", "country", "state", "admin1"]]
+            gadm = gadm[["geometry", "country", "admin1"]]
 
         elif admin == "admin2":
             gadm_fn = f"gadm36_2.feather"
             gadmDir = f"{download_data_folder}/{gadm_fn}"
             gadm = gf.from_geofeather(gadmDir)
             gadm["country"] = gadm["NAME_0"]
-            gadm["state"] = gadm["NAME_1"]
+            #gadm["state"] = gadm["NAME_1"]
             gadm["admin1"] = gadm["NAME_1"]
             gadm["admin2"] = gadm["NAME_2"]
-            gadm = gadm[["geometry", "country", "state", "admin1", "admin2"]]
+            #gadm = gadm[["geometry", "country", "state", "admin1", "admin2"]]
+            gadm = gadm[["geometry", "country", "admin1", "admin2"]]
 
         elif admin == "admin3":
             gadm_fn = f"gadm36_3.feather"
             gadmDir = f"{download_data_folder}/{gadm_fn}"
             gadm = gf.from_geofeather(gadmDir)
             gadm["country"] = gadm["NAME_0"]
-            gadm["state"] = gadm["NAME_1"]
+            #gadm["state"] = gadm["NAME_1"]
             gadm["admin1"] = gadm["NAME_1"]
             gadm["admin2"] = gadm["NAME_2"]
             gadm["admin3"] = gadm["NAME_3"]
-            gadm = gadm[["geometry", "country", "state", "admin1", "admin2", "admin3"]]        
+            #gadm = gadm[["geometry", "country", "state", "admin1", "admin2", "admin3"]]
+            gadm = gadm[["geometry", "country", "admin1", "admin2", "admin3"]]
 
     start_time = timeit.default_timer()
 
@@ -1162,8 +1165,8 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True,
     # "meta" portion of schema specifies transformation type
     transform = mapper["meta"]
 
-    # Checker transform for meta.geocode_level. Update admin to this if present.
-    if "geocode_level" in transform:
+    # Check transform for meta.geocode_level. Update admin to this if present.
+    if (admin == None and "geocode_level" in transform):
         admin = transform["geocode_level"]
 
     ftype = transform["ftype"]
@@ -1395,12 +1398,15 @@ class mixdata:
         gadmDir = f"{download_data_folder}/{gadm_fn}"
         gadm = gf.from_geofeather(gadmDir)
         gadm["country"] = gadm["NAME_0"]
-        gadm["state"] = gadm["NAME_1"]
+        #gadm["state"] = gadm["NAME_1"]
         gadm["admin1"] = gadm["NAME_1"]
         gadm["admin2"] = gadm["NAME_2"]    
         gadm0 = gadm[["geometry", "country"]]
-        gadm1 = gadm[["geometry", "country", "state", "admin1"]]
-        gadm2 = gadm[["geometry", "country", "state", "admin1", "admin2"]]
+        #gadm1 = gadm[["geometry", "country", "state", "admin1"]]
+        #gadm2 = gadm[["geometry", "country", "state", "admin1", "admin2"]]
+        gadm1 = gadm[["geometry", "country", "admin1"]]
+        gadm2 = gadm[["geometry", "country", "admin1", "admin2"]]
+        
         self.gadm0 = gadm0
         self.gadm1 = gadm1
         self.gadm2 = gadm2
@@ -1413,11 +1419,12 @@ class mixdata:
         gadmDir = f"{download_data_folder}/{gadm_fn}"
         gadm3 = gf.from_geofeather(gadmDir)
         gadm3["country"] = gadm3["NAME_0"]
-        gadm3["state"] = gadm3["NAME_1"]
+        #gadm3["state"] = gadm3["NAME_1"]
         gadm3["admin1"] = gadm3["NAME_1"]
         gadm3["admin2"] = gadm3["NAME_2"]
         gadm3["admin3"] = gadm3["NAME_3"]
-        gadm3 = gadm3[["geometry", "country", "state", "admin1", "admin2", "admin3"]]
+        #gadm3 = gadm3[["geometry", "country", "state", "admin1", "admin2", "admin3"]]
+        gadm3 = gadm3[["geometry", "country", "admin1", "admin2", "admin3"]]
         self.gadm3 = gadm3
         
 
@@ -1463,9 +1470,15 @@ class mixdata:
 #geo = 'admin2'
 #outf = 'examples/causemosify-tests'
 
+#fp = "examples/causemosify-tests/example.csv"
+#mp = "examples/causemosify-tests/example.json"
+#geo = 'admin2'
+#outf = 'examples/causemosify-tests'
+
 #start_time = timeit.default_timer()
 #df = pd.DataFrame()
-#df, dct = process(fp, mp,geo, outf)
+#print('processing...')
+#df, dct = process(fp, mp, geo, outf)
 #print('process time', timeit.default_timer() - start_time)
 #cols = ['timestamp','country','admin1','admin2','admin3','lat','lng','feature','value']
 #df.sort_values(by=cols, inplace=True)

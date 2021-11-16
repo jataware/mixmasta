@@ -152,7 +152,15 @@ def chunk_normalize(input_file: str, mapper: dict, renamed_col_dict: dict, geo: 
 def get_gadm(geo: str):
     # Cache GADM for normalize() loops.
     md = mixdata()
-    if geo.lower() == 'admin2':
+    if geo.lower() in ['admin0', 'country']:
+        click.echo('Loading GADM0 ...')
+        md.load_gadm2()
+        gadm = md.gadm0
+    elif geo.lower() == 'admin1':
+        click.echo('Loading GADM1 ...')
+        md.load_gadm2()
+        gadm = md.gadm1
+    elif geo.lower() == 'admin2':
         click.echo('Loading GADM2 ...')
         md.load_gadm2()
         gadm = md.gadm2
@@ -179,24 +187,32 @@ def glob_input_file(input_file: str) -> str:
             input_file = input_file
     return input_file
 
-
 @cli.command()
 @click.option("--input_file", type=str, default=None)
 @click.option("--mapper", type=str, default=None)
 @click.option("--geo", type=str, default=None)
 @click.option("--output_file", type=str, default="mixmasta_output")
-def causemosify(input_file, mapper, geo: str, output_file):
+def causemosify(input_file, mapper, geo: str = None, output_file: str = "mixmasta_output"):
     """Processor for generating CauseMos compliant datasets."""
     click.echo("Causemosifying data...")
 
     input_file =  glob_input_file(input_file)
-    gadm = get_gadm(geo)
+    
     with open(mapper) as f:
         mapper = json.loads(f.read())
 
+    # Check transform for meta.geocode_level. This is overriden by geo parameter.
+    if geo == None:
+        transform = mapper["meta"]
+        if "geocode_level" in transform:
+            geo = transform["geocode_level"]
+
+    gadm = get_gadm(geo)
+
     # Chunk normalized, return the renamed_dict. The data will be read from pkl
     # files beelow.
-    renamed_col_dict = chunk_normalize(input_file, mapper, {}, geo, gadm)
+    df_geocode = pd.DataFrame()
+    renamed_col_dict = chunk_normalize(input_file, mapper, {}, geo, gadm, df_geocode)
 
     # Reassemble tmp pkl files.
     df_final = pd.concat([pd.read_pickle(fl) for fl in glob(f'{PROCESSED_TEMP_FILENAME}.*.pkl')])
@@ -229,7 +245,7 @@ def causemosify(input_file, mapper, geo: str, output_file):
 @click.option("--inputs", type=str, default=None)
 @click.option("--geo", type=str, default=None)
 @click.option("--output-file", type=str, default="mixmasta_output")
-def causemosify_multi(inputs, geo, output_file):
+def causemosify_multi(inputs, geo: str = None, output_file: str = "mixmasta_output"):
     """Process multiple input files to generate a single CauseMos compliant dataset."""
 
     """
@@ -248,9 +264,6 @@ def causemosify_multi(inputs, geo, output_file):
     input_array = json.loads(inputs)   
     click.echo(f"Causemosifying {len(input_array)} file(s) ...")
     
-    # Cache GADM for normalize() loops.
-    gadm = get_gadm(geo)
-
     # Setup variables.
     renamed_col_dict = {}
     df_geocode = pd.DataFrame()
@@ -264,6 +277,12 @@ def causemosify_multi(inputs, geo, output_file):
   
     # Iterate each item_item in the --inputs JSON.
     item_counter = 0
+
+    # Geo control varibles to avoid reloading GADM.
+    item_geo = None # geo for item to be processed
+    last_geo = None # geo of last item processed
+    gadm = pd.DataFrame()
+
     for item_item in input_array:        
         item_counter += 1
         # Handle filename wildcards with glob_input_file().
@@ -271,6 +290,24 @@ def causemosify_multi(inputs, geo, output_file):
        
         with open(item_item ["mapper"]) as f:
             mapper = json.loads(f.read())
+
+        # Check transform for meta.geocode_level. This is overriden by geo parameter.
+        if geo == None:
+            transform = mapper["meta"]
+            if "geocode_level" in transform:
+                loop_geo = transform["geocode_level"]
+
+                if (loop_geo != last_geo or gadm.empty):
+                    gadm = get_gadm(loop_geo)
+
+                last_geo = loop_geo
+            else:
+                click.echo("No geo specified and no meta.geocode_level in mapper.json. Stopping.")
+                break
+        else:
+            # geo specified in command line; overrides meta.geocode_level.
+            if gadm.empty:
+                gadm = get_gadm(geo)
 
         renamed_col_dict = chunk_normalize(input_file = input_file, 
             mapper = mapper, 
@@ -379,30 +416,37 @@ if __name__ == "__main__":
     
     cli()
     '''
-    Testing
+    # Testing
     if os.name == 'nt':
         sep = '\\'
     else:
         sep = '/'
         
 
-    inputs = "[ {\"input_file\":\"Test1_2D-Q.nc\", "
-    inputs = inputs + "\"mapper\":\"mapper_e489d023-58c3-4544-8ae1-bb9cfa987e23.json\"},"
+    #inputs = "[ {\"input_file\":\"Test1_2D-Q.nc\", "
+    #inputs = inputs + "\"mapper\":\"mapper_e489d023-58c3-4544-8ae1-bb9cfa987e23.json\"},"
 
-    inputs = inputs + "{\"input_file\":\"Test1_2D-d-flood.nc\", \"mapper\":\"mapper_25d1d6ab-1e74-4084-8c18-692e6542aa49.json\"},"
-    inputs = inputs + "{\"input_file\":\"Test1_2D-d.nc\", \"mapper\":\"mapper_7302d901-85b8-4fab-a3b2-b9e0b9646458.json\"},"
-    inputs = inputs + "{\"input_file\":\"Test1_2D-u.nc\", \"mapper\":\"mapper_c925ad6e-5275-4a2c-b288-ba7c450a4b8f.json\"}"
-    
-    inputs = inputs + "]"
+    #inputs = inputs + "{\"input_file\":\"Test1_2D-d-flood.nc\", \"mapper\":\"mapper_25d1d6ab-1e74-4084-8c18-692e6542aa49.json\"},"
+    #inputs = inputs + "{\"input_file\":\"Test1_2D-d.nc\", \"mapper\":\"mapper_7302d901-85b8-4fab-a3b2-b9e0b9646458.json\"},"
+    #inputs = inputs + "{\"input_file\":\"Test1_2D-u.nc\", \"mapper\":\"mapper_c925ad6e-5275-4a2c-b288-ba7c450a4b8f.json\"}"
+    #inputs = inputs + "]"
 
     #inputs = "[ {\"input_file\":\"lpjml_sample.nc\", "
     #inputs = inputs + "\"mapper\":\"lpml_mapper.json\"}]"
 
-    inputs = "[{\"input_file\": \"inputs" + f"{sep}test1_input.csv\",\"mapper\": \"inputs{sep}test1_input.json\"" + "},{\"input_file\": \""
-    inputs = inputs + f"inputs{sep}test3_qualifies.csv\",\"mapper\": \"inputs{sep}test3_qualifies.json\"" + "}]"
+    #inputs = "[{\"input_file\": \"inputs" + f"{sep}test1_input.csv\",\"mapper\": \"inputs{sep}test1_input.json\"" + "},{\"input_file\": \""
+    #inputs = inputs + f"inputs{sep}test3_qualifies.csv\",\"mapper\": \"inputs{sep}test3_qualifies.json\"" + "}]"
 
-
-
-    causemosify_multi(inputs, geo='admin2', output_file='testing')
+    #causemosify_multi(inputs, geo='admin2', output_file='testing')
     #causemosify(input_file="lpjml_sample.nc", mapper="lpml_mapper.json", geo="admin2", output_file="output.tmp")
+
+    #df_final, renamed_col_dict= causemosify(input_file="./examples/causemosify-tests/example.csv", mapper="./examples/causemosify-tests/example.json", 
+    #    output_file="output.tmp")
+    #print(df_final.head())
+
+    ## Test meta.geocode_level vs. geo parameter
+    inputs = "[{\"input_file\": \"./tests/inputs" + f"{sep}test1_input.csv\",\"mapper\": \"./tests/inputs{sep}test1_input.json\"" + "},{\"input_file\": \""
+    inputs = inputs + f"./tests/inputs{sep}test3_qualifies.csv\",\"mapper\": \"./tests/inputs{sep}test3_qualifies.json\"" + "}]"
+
+    causemosify_multi(inputs, geo='admin2', output_file='testing') # geo='admin1', 
     '''
