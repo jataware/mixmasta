@@ -235,7 +235,6 @@ class TestMixmaster(unittest.TestCase):
             print(result)
         self.assertEqual(result.returncode, 0)
         
-
         ## Compare parquet files.
         df1 = pd.read_parquet(f"outputs{sep}unittests.1.parquet.gzip")
         df2 = pd.read_parquet(f"outputs{sep}unittests.2.parquet.gzip")

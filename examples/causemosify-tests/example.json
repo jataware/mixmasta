@@ -1,0 +1,112 @@
+{
+  "meta": {
+    "ftype": "csv",
+    "sheet": "data-tab-1",
+    "geocode_level": "admin1"
+  },
+  "geo": [
+    {
+      "name": "latitude",
+      "display_name": "latitude",
+      "type": "geo",
+      "geo_type": "latitude",
+      "primary_geo": true,
+      "is_geo_pair": "longitude"
+    },
+    {
+      "name": "longitude",
+      "type": "geo",
+      "geo_type": "longitude",
+      "primary_geo": true,
+      "is_geo_pair": "latitude"
+    },
+    {
+      "name": "country",
+      "type": "geo",
+      "geo_type": "country"
+    },
+    {
+      "name": "coords",
+      "type": "geo",
+      "geo_type": "coordinates",
+      "coord_format": "lonlat"
+    },
+    {
+      "name": "iso2",
+      "type": "geo",
+      "geo_type": "iso2"
+    },
+    {
+      "name": "state",
+      "type": "geo",
+      "geo_type": "state/territory"
+    }
+  ],
+  "date": [
+    {
+      "name": "date",
+      "display_name": "date",
+      "type": "date",
+      "date_type": "date",
+      "primary_date": true,
+      "time_format": "%Y-%m-%d"
+    },
+    {
+      "name": "year_column",
+      "type": "date",
+      "date_type": "year",
+      "time_format": "%Y",
+      "associated_columns": {
+        "month" : "month_column",
+        "day" : "day_column"
+      }
+    },
+    {
+      "name": "month_column",
+      "type": "date",
+      "date_type": "month",
+      "time_format": "%m",
+      "associated_columns": {
+        "year" : "year_column",
+        "day" : "day_column"
+      }
+    },
+    {
+      "name": "day_column",
+      "type": "date",
+      "date_type": "day",
+      "time_format": "%d",
+      "associated_columns": {
+        "year" : "year_column",
+        "month" : "month_column"
+      }
+    }
+  ],
+  "feature": [
+    {
+      "name": "pop",
+      "display_name": "Adult Population",
+      "description": "Total number of adults living in the region.",
+      "type": "feature",
+      "feature_type": "int",
+      "units": "persons",
+      "units_description": "number of persons"
+    },
+    {
+      "name": "health_ind",
+      "display_name": "Health Index",
+      "description": "Health index for the region.",
+      "type": "feature",
+      "feature_type": "float",
+      "units": "unitless index",
+      "units_description": "N/A"
+    },
+    {
+      "name": "primary_industry",
+      "display_name": "Primary Industry",
+      "description": "The primary industry for the region. One of [agriculture, oil/gas, manufacturing, other]",
+      "type": "feature",
+      "feature_type": "str"
+    }
+  ]
+}
