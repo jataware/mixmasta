@@ -7,7 +7,6 @@ import pandas as pd
 
 from .download import download_and_clean
 from .mixmasta import geocode, netcdf2df, process, raster2df, normalizer, optimize_df_types, mixdata
-
 #from download import download_and_clean
 #from mixmasta import geocode, netcdf2df, process, raster2df, normalizer, optimize_df_types, mixdata
 
@@ -104,7 +103,7 @@ def chunk_normalize(input_file: str, mapper: dict, renamed_col_dict: dict, geo: 
     click.echo(f'Processing {input_file} ...')
     start_time = timeit.default_timer()
     
-    # Iterate chunk tmp files and normalized each loaded df.
+    # Iterate chunk tmp files and normalize each loaded df.
     for i in range(1, chunks+1): 
         read_filename = f'{DATA_TEMP_FILENAME}.{i}.pkl' 
         df_temp = pd.read_pickle(read_filename)
@@ -286,8 +285,10 @@ def causemosify_multi(inputs, geo: str = None, output_file: str = "mixmasta_outp
     last_geo = None # geo of last item processed
     gadm = pd.DataFrame()
 
+    # All output files should have the same columns.
+    output_columns = [] 
+
     for item_item in input_array:        
-        item_counter += 1
         # Handle filename wildcards with glob_input_file().
         input_file =  glob_input_file(item_item["input_file"])
        
@@ -324,12 +325,41 @@ def causemosify_multi(inputs, geo: str = None, output_file: str = "mixmasta_outp
             gadm=gadm,
             df_geocode=df_geocode)
 
+        df_col = pd.read_pickle(f'{PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}.1.pkl')
+
+        # Maintain master list of output columns while respecting column order.
+        if len(output_columns) == 0:
+            output_columns = df_col.columns.values.tolist()
+        else:
+            # Only add the columns in the df_col not in output_columns.
+            output_columns = output_columns + list(set(df_col.columns.values.tolist()).difference(set(output_columns)))
+
+    # At this point all mixmasta.normalize() is completed for all input files. 
+    # There will be multiple .pkl files with the prefix 
+    # {PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}
+    # 
+    # Processing of these pkl files is delayed so that the column names of 
+    # output files were collated ensuring the parquet files have the same 
+    # columns even if they are full of NaN.
+
+    # Reiterate the input file names. Load all tmp pkl files. Set colnames.
+    for idx, item_item in enumerate(input_array):
+        # Handle filename wildcards with glob_input_file().
+        input_file =  glob_input_file(item_item["input_file"])
+    
         # Reassemble tmp files into df ...)
-        df_final = pd.concat([pd.read_pickle(fl) for fl in glob(f'{PROCESSED_TEMP_FILENAME}.*.pkl')])
+        df_final = pd.concat([pd.read_pickle(fl) for fl in glob(f'{PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}.*.pkl')])
+
+        # Add any columns in output_columns but not in this dataframe.
+        for col in list(set(output_columns).difference(set(df_final.columns.values.tolist()))):
+            df_final[col] = np.nan
+
+        # Ensure column order is the same across all output files.
+        df_final = df_final[output_columns]
         df_final.reset_index(inplace=True, drop=True)
     
         # ... then clean up reassembly. 
-        for fl in glob(f'{PROCESSED_TEMP_FILENAME}*'):
+        for fl in glob(f'{PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}.*'):
             os.remove(fl)
        
         # Write separate parquet files depending on type of value column ...
@@ -341,10 +371,10 @@ def causemosify_multi(inputs, geo: str = None, output_file: str = "mixmasta_outp
         del(df_final['type'])
 
         # ... now write the files.
-        df_final.to_parquet(f"{output_file}.{item_counter}.parquet.gzip", compression="gzip")
+        df_final.to_parquet(f"{output_file}.{idx+1}.parquet.gzip", compression="gzip")
         if not df_final_str.empty:
-            df_final_str.to_parquet(f"{output_file}_str.{item_counter}.parquet.gzip", compression="gzip")
-    
+            df_final_str.to_parquet(f"{output_file}_str.{idx+1}.parquet.gzip", compression="gzip")
+
     # Causemosify-multi does not return the dataframe or dict.
 
     click.echo('Done.')
@@ -430,10 +460,8 @@ if __name__ == "__main__":
     else:
         sep = '/'
         
-
     #inputs = "[ {\"input_file\":\"Test1_2D-Q.nc\", "
     #inputs = inputs + "\"mapper\":\"mapper_e489d023-58c3-4544-8ae1-bb9cfa987e23.json\"},"
-
     #inputs = inputs + "{\"input_file\":\"Test1_2D-d-flood.nc\", \"mapper\":\"mapper_25d1d6ab-1e74-4084-8c18-692e6542aa49.json\"},"
     #inputs = inputs + "{\"input_file\":\"Test1_2D-d.nc\", \"mapper\":\"mapper_7302d901-85b8-4fab-a3b2-b9e0b9646458.json\"},"
     #inputs = inputs + "{\"input_file\":\"Test1_2D-u.nc\", \"mapper\":\"mapper_c925ad6e-5275-4a2c-b288-ba7c450a4b8f.json\"}"
