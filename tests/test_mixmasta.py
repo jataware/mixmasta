@@ -304,25 +304,22 @@ class TestMixmaster(unittest.TestCase):
         assert_frame_equal(df, output_df, check_categorical = False)
         assert_dict_equal(dct, output_dict)
 
-    def test_007_single_band_tif(self):
-        """ This tests single-band geotiff processing."""
+    def test_008_aliases(self):
+        """ This tests feature name aliases."""
 
         # Define mixmasta inputs:
-        mp = f'inputs{sep}test7_single_band_tif_input.json'
-        fp = f'inputs{sep}test7_single_band_tif_input.tif'
+        mp = f'inputs{sep}test8_aliases_input.json'
+        fp = f'inputs{sep}test8_aliases_input.csv'
         geo = 'admin2'
         outf = f'outputs{sep}unittests'
 
         # Process:
         df, dct = mixmasta.process(fp, mp, geo, outf)
-        #categories = df.select_dtypes(include=['category']).columns.tolist()
-        df['value'] = df['value'].astype('str')
 
         # Load expected output:
-        output_df = pd.read_csv(f'outputs{sep}test7_single_band_tif_output.csv', index_col=False)
-
-        with open(f'outputs{sep}test7_single_band_tif_dict.json') as f:
-            output_dict = json.loads(f.read())
+        output_df = pd.read_parquet(f'outputs{sep}test8_aliases.parquet.gzip', index_col=False)
+        output_df2 = pd.read_parquet(f'outputs{sep}test8_aliases_str.parquet.gzip', index_col=False)
+        output_df = output_df.append(output_df2)
 
         # Sort both data frames and reindex for comparison,.
         cols = ['timestamp','country','admin1','admin2','admin3','lat','lng','feature','value']
@@ -351,7 +348,8 @@ class TestMixmaster(unittest.TestCase):
 
         # Assertions
         assert_frame_equal(df, output_df, check_categorical = False)
-        assert_dict_equal(dct, output_dict)
+        # assert_dict_equal(dct, output_dict)
+
 
 
 if __name__ == '__main__':
