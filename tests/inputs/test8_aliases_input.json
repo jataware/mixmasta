@@ -115,7 +115,20 @@
              "4":"development",
              "5":"residential"
           }
-       }
+       },
+       {
+         "name":"funded",
+         "display_name":"funded",
+         "description":"bool",
+         "type":"feature",
+         "feature_type":"bool",
+         "units":"ascas",
+         "units_description":"asdca",
+         "aliases":{
+            "True":"yes",
+            "False":"no"
+         }
+      }       
     ],
     "meta":{
        "ftype":"csv"

@@ -6,6 +6,7 @@ import os
 import sys
 from datetime import datetime
 from typing import List
+from distutils.util import strtobool
 
 import geofeather as gf
 import geopandas as gpd
@@ -1022,19 +1023,25 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
         # Convert aliases based on user annotations
         aliases = feature_dict.get("aliases", {})
         if aliases:
+            type_ = df[feature_dict["name"]].dtype
             aliases_ = {}
             # Need to handle cases where keys are ints/floats
             # this could potentially break if the user stored numbers
             # as strings since the converted int/float won't appropriately
             # support the replace function
             for kk, vv in aliases.items():
-                if kk.isnumeric():
-                    aliases_[int(kk)] = vv
-                else:
-                    try:
+                try:
+                    if type_ == np.int:
+                            aliases_[int(kk)] = vv
+                    elif type_ == np.float64:
                         aliases_[float(kk)] = vv
-                    except ValueError:
-                        aliases_[kk] = vv
+                    elif type_ == bool:
+                        if strtobool(kk) == 1:
+                            aliases_[True] = vv
+                        else:
+                            aliases_[False] = vv
+                except ValueError:
+                    aliases_[kk] = vv
             click.echo(f"Aliases for {feature_dict['name']} are {aliases_}.")
             df[[feature_dict["name"]]] = df[[feature_dict["name"]]].replace(aliases_)
             
