@@ -313,43 +313,24 @@ class TestMixmaster(unittest.TestCase):
         geo = 'admin2'
         outf = f'outputs{sep}unittests'
 
-        # Process:
-        df, dct = mixmasta.process(fp, mp, geo, outf)
+        inputs = "--inputs=[{\"input_file\": \"inputs" + f"{sep}test8_aliases_input.csv\",\"mapper\": \"inputs{sep}test8_aliases_input.json\"" + "}]"
+        result = subprocess.run(['mixmasta', "causemosify-multi", inputs, "--geo=admin2", f"--output-file=outputs{sep}unittests"], capture_output=True, encoding='utf-8')
 
-        # Load expected output:
-        output_df = pd.read_parquet(f'outputs{sep}test8_aliases.parquet.gzip', index_col=False)
-        output_df2 = pd.read_parquet(f'outputs{sep}test8_aliases_str.parquet.gzip', index_col=False)
-        output_df = output_df.append(output_df2)
+        if (result.returncode != 0):
+            print(result)
+        self.assertEqual(result.returncode, 0)
 
-        # Sort both data frames and reindex for comparison,.
-        cols = ['timestamp','country','admin1','admin2','admin3','lat','lng','feature','value']
-        df = df[cols]
-        output_df = output_df[cols]
+        ## Compare parquet files.
+        df1 = pd.read_parquet(f"outputs{sep}unittests.1.parquet.gzip")
+        df2 = pd.read_parquet(f"outputs{sep}unittests_str.1.parquet.gzip")
+        df = df1.append(df2)
 
-        # Optimize datatypes for output_df.
-        floats = output_df.select_dtypes(include=['float64']).columns.tolist()
-        output_df[floats] = output_df[floats].apply(pd.to_numeric, downcast='float')
-
-        ints = output_df.select_dtypes(include=['int64']).columns.tolist()
-        output_df[ints] = output_df[ints].apply(pd.to_numeric, downcast='integer')
-
-        # Standardize value and feature columns to str for comparison.
-        df['value'] = df['value'].astype('str')
-        df['feature'] = df['feature'].astype('str')
-        output_df['value'] = output_df['value'].astype('str')
-        output_df['feature'] = output_df['feature'].astype('str')
-
-        # Sort and reindex.
-        df.sort_values(by=cols, inplace=True)
-        df.reset_index(drop=True, inplace=True)
-
-        output_df.sort_values(by=cols, inplace=True)
-        output_df.reset_index(drop=True, inplace=True)
+        output_df_1 = pd.read_parquet(f"outputs{sep}test8_aliases.parquet.gzip")
+        output_df_2 = pd.read_parquet(f"outputs{sep}test8_aliases_str.parquet.gzip")
+        output_df = output_df_1.append(output_df_2)
 
         # Assertions
         assert_frame_equal(df, output_df, check_categorical = False)
-        # assert_dict_equal(dct, output_dict)
-
 
 
 if __name__ == '__main__':
