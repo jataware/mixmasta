@@ -1023,25 +1023,30 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
         # Convert aliases based on user annotations
         aliases = feature_dict.get("aliases", {})
         if aliases:
-            type_ = df[feature_dict["name"]].dtype
+            click.echo(f"Pre-processed aliases are: {aliases}")
+            type_ = df[feature_dict["name"]].dtype.type
             aliases_ = {}
-            # Need to handle cases where keys are ints/floats
-            # this could potentially break if the user stored numbers
-            # as strings since the converted int/float won't appropriately
-            # support the replace function
+            # The goal below is to identify the data type and then to cast the 
+            # alias key from string into that type so that it will match
+            # if that fails, just cast it as a string
             for kk, vv in aliases.items():
                 try:
-                    if type_ == np.int:
+                    if issubclass(type_, (int, np.integer)):
                             aliases_[int(kk)] = vv
-                    elif type_ == np.float64:
+                    elif issubclass(type_, (float, np.float16, np.float32, np.float64, np.float128)):
                         aliases_[float(kk)] = vv
-                    elif type_ == bool:
+                    elif issubclass(type_, (bool, np.bool)):
                         if strtobool(kk) == 1:
                             aliases_[True] = vv
                         else:
                             aliases_[False] = vv
-                except ValueError:
+                    # Fall back on string
+                    else:
+                        aliases_[kk] = vv
+                except ValueError as e:
+                    # Fall back on string
                     aliases_[kk] = vv
+                click.echo(aliases_)
             click.echo(f"Aliases for {feature_dict['name']} are {aliases_}.")
             df[[feature_dict["name"]]] = df[[feature_dict["name"]]].replace(aliases_)
             
