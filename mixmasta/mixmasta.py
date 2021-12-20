@@ -1025,6 +1025,7 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
         if aliases:
             click.echo(f"Pre-processed aliases are: {aliases}")
             type_ = df[feature_dict["name"]].dtype.type
+            click.echo(f"Detected column type is: {type_}")
             aliases_ = {}
             # The goal below is to identify the data type and then to cast the 
             # alias key from string into that type so that it will match
@@ -1032,21 +1033,27 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
             for kk, vv in aliases.items():
                 try:
                     if issubclass(type_, (int, np.integer)):
-                            aliases_[int(kk)] = vv
+                        click.echo("Aliasing: integer detected")
+                        aliases_[int(kk)] = vv
                     elif issubclass(type_, (float, np.float16, np.float32, np.float64, np.float128)):
+                        click.echo("Aliasing: float detected")
                         aliases_[float(kk)] = vv
-                    elif issubclass(type_, (bool, np.bool)):
+                    elif issubclass(type_, (bool, np.bool, np.bool_)):
+                        click.echo("Aliasing: boolean detected")
                         if strtobool(kk) == 1:
                             aliases_[True] = vv
+                            click.echo("Converted true string to boolean")
                         else:
+                            click.echo("Converted false string to boolean")
                             aliases_[False] = vv
                     # Fall back on string
                     else:
+                        click.echo("Aliasing: string detected")
                         aliases_[kk] = vv
                 except ValueError as e:
                     # Fall back on string
+                    click.echo(f"Error: {e}")
                     aliases_[kk] = vv
-                click.echo(aliases_)
             click.echo(f"Aliases for {feature_dict['name']} are {aliases_}.")
             df[[feature_dict["name"]]] = df[[feature_dict["name"]]].replace(aliases_)
             
