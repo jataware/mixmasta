@@ -1,11 +1,12 @@
 """Main module."""
 import json
 import logging
+import click
 import os
 import sys
 from datetime import datetime
 from typing import List
-
+from distutils.util import strtobool
 
 import geofeather as gf
 import geopandas as gpd
@@ -719,6 +720,8 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
     df, mapper, renamed_col_dict = handle_colname_collisions(df, mapper, col_order)
 
     ### mapper is a dictionary of lists of dictionaries.
+    click.echo("Raw dataframe:")
+    click.echo(df.head())
 
     # list of names of datetime columns primary_date=True
     primary_time_cols = [k['name'] for k in mapper['date'] if 'primary_date' in k and k['primary_date'] == True]
@@ -994,7 +997,6 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
                     continue
             features.append(kk)
 
-
     # Append columns annotated in feature dict to features list (if not a
     # qualifies column)
     #features.extend([k["name"] for k in mapper["feature"]])
@@ -1017,6 +1019,49 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
                     qualified_col_dict[k].append(kk)
                 else:
                     qualified_col_dict[k] = [kk]
+
+        # Convert aliases based on user annotations
+        aliases = feature_dict.get("aliases", {})
+        if aliases:
+            click.echo(f"Pre-processed aliases are: {aliases}")
+            type_ = df[feature_dict["name"]].dtype.type
+            click.echo(f"Detected column type is: {type_}")
+            aliases_ = {}
+            # The goal below is to identify the data type and then to cast the 
+            # alias key from string into that type so that it will match
+            # if that fails, just cast it as a string
+            for kk, vv in aliases.items():
+                try:
+                    if issubclass(type_, (int, np.integer)):
+                        click.echo("Aliasing: integer detected")
+                        aliases_[int(kk)] = vv
+                    elif issubclass(type_, (float, np.float16, np.float32, np.float64, np.float128)):
+                        click.echo("Aliasing: float detected")
+                        aliases_[float(kk)] = vv
+                    elif issubclass(type_, (bool, np.bool, np.bool_)):
+                        click.echo("Aliasing: boolean detected")
+                        if strtobool(kk) == 1:
+                            aliases_[True] = vv
+                            click.echo("Converted true string to boolean")
+                        else:
+                            click.echo("Converted false string to boolean")
+                            aliases_[False] = vv
+                    # Fall back on string
+                    else:
+                        click.echo("Aliasing: string detected")
+                        aliases_[kk] = vv
+                except ValueError as e:
+                    # Fall back on string
+                    click.echo(f"Error: {e}")
+                    aliases_[kk] = vv
+            click.echo(f"Aliases for {feature_dict['name']} are {aliases_}.")
+            df[[feature_dict["name"]]] = df[[feature_dict["name"]]].replace(aliases_)
+            
+            # Since the user has decided to apply categorical aliases to this feature, we must coerce
+            # the entire feature to a string, even if they did not alias every value within the feature
+            # the reason for this is to avoid mixed types within the feature (e.g. half int/half string) 
+            # since this makes it difficult to visualize
+            df[[feature_dict["name"]]] = df[[feature_dict["name"]]].astype(str)
 
     # perform geocoding if lat/lng are present
     if "lat" in df and "lng" in df:
@@ -1115,6 +1160,8 @@ def normalizer(df: pd.DataFrame, mapper: dict, admin: str, gadm: gpd.GeoDataFram
     # Handle any renamed cols being renamed.
     renamed_col_dict = audit_renamed_col_dict(renamed_col_dict)
     
+    click.echo("Processed dataframe:")
+    click.echo(df_out.head())
     return df_out[col_order], renamed_col_dict, df_geocode
 
 def optimize_df_types(df: pd.DataFrame):

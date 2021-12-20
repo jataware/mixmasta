@@ -353,6 +353,34 @@ class TestMixmaster(unittest.TestCase):
         assert_frame_equal(df, output_df, check_categorical = False)
         assert_dict_equal(dct, output_dict)
 
+    def test_008_aliases(self):
+        """ This tests feature name aliases."""
+
+        # Define mixmasta inputs:
+        mp = f'inputs{sep}test8_aliases_input.json'
+        fp = f'inputs{sep}test8_aliases_input.csv'
+        geo = 'admin2'
+        outf = f'outputs{sep}unittests'
+
+        inputs = "--inputs=[{\"input_file\": \"inputs" + f"{sep}test8_aliases_input.csv\",\"mapper\": \"inputs{sep}test8_aliases_input.json\"" + "}]"
+        result = subprocess.run(['mixmasta', "causemosify-multi", inputs, "--geo=admin2", f"--output-file=outputs{sep}unittests"], capture_output=True, encoding='utf-8')
+
+        if (result.returncode != 0):
+            print(result)
+        self.assertEqual(result.returncode, 0)
+
+        ## Compare parquet files.
+        df1 = pd.read_parquet(f"outputs{sep}unittests.1.parquet.gzip")
+        df2 = pd.read_parquet(f"outputs{sep}unittests_str.1.parquet.gzip")
+        df = df1.append(df2)
+
+        output_df_1 = pd.read_parquet(f"outputs{sep}test8_aliases.parquet.gzip")
+        output_df_2 = pd.read_parquet(f"outputs{sep}test8_aliases_str.parquet.gzip")
+        output_df = output_df_1.append(output_df_2)
+
+        # Assertions
+        assert_frame_equal(df, output_df, check_categorical = False)
+
 
 if __name__ == '__main__':
     unittest.main()

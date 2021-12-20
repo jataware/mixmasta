@@ -16,8 +16,9 @@ ENV C_INCLUDE_PATH=/usr/include/gdal
 RUN pip3 install numpy==1.20.1
 
 WORKDIR /
-COPY . /
+COPY requirements.txt /requirements.txt
 RUN pip3 install -r requirements.txt
+COPY . /
 RUN python3 setup.py install
 RUN mixmasta download
 
