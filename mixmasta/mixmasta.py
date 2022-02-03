@@ -1338,14 +1338,6 @@ def raster2df(
     df = pd.DataFrame()
     row_data_type = None
 
-    # Create columns for the dataframe.
-    if bands == None:
-        columns = ["longitude", "latitude", feature_name]
-    elif band_type == 'datetime':
-        columns=["longitude", "latitude", 'date', feature_name]
-    else:
-        columns=["longitude", "latitude", feature_name, band_name]
-
     for x in range(1, ds.RasterCount+1):
         # If band has a value, then limit import to the single specified band.
         if band > 0 and band != x:
@@ -1359,8 +1351,17 @@ def raster2df(
             band_value = bands[str(x)] 
         else:
             continue
+
+        # Create columns for the dataframe.
+        if bands == None:
+            columns = ["longitude", "latitude", feature_name]
+        elif band_type == 'datetime':
+            columns=["longitude", "latitude", 'date', feature_name]
+        else:
+            # Add columns during processing.
+            columns=["longitude", "latitude", band_value]
                 
-        rBand = ds.GetRasterBand(x)  # (band) # first band
+        rBand = ds.GetRasterBand(x)  
         nData = rBand.GetNoDataValue()
 
         if nData == None:
@@ -1404,9 +1405,7 @@ def raster2df(
                     # if (RowData[ThisCol] <= 100) and (RowData[ThisCol] >= -100):
 
                     X = GeoTrans[0] + (ThisCol * GeoTrans[1])
-                    Y = GeoTrans[3] + (
-                        ThisRow * GeoTrans[5]
-                    )  # Y is negative so it's a minus
+                    Y = GeoTrans[3] + (ThisRow * GeoTrans[5])  # Y is negative so it's a minus
                     # this gives the upper left of the cell, offset by half a cell to get centre
                     X += HalfX
                     Y += HalfY
@@ -1417,7 +1416,7 @@ def raster2df(
                     elif band_type == 'datetime':
                         points.append([X, Y, band_value, row_value])
                     else:
-                        points.append([X, Y, row_value, band_value])
+                        points.append([X, Y, row_value])
 
         # This will make all floats float64, but will be optimized in process().
         new_df = pd.DataFrame(points, columns=columns)
@@ -1426,7 +1425,11 @@ def raster2df(
             df = new_df
         else:
             #df = df.merge(new_df, left_on=["longitude", "latitude"], right_on=["longitude", "latitude"])
-            df = df.append(new_df)
+            if (bands and band_type != 'datetime'):
+                #df.join(new_df, on=["longitude", "latitude"])
+                df = df.merge(new_df, left_on=["longitude", "latitude"], right_on=["longitude", "latitude"])
+            else:
+                df = df.append(new_df)
 
     # Add the date from the mapper.
     if (date and band_type != 'datetime'):
