@@ -1218,19 +1218,15 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True,
 
     ftype = transform["ftype"]
     if ftype == "geotiff":
-        if transform["date"] == "":
-            d = None
-        else:
-            d = transform["date"]
-
         df = raster2df(
             InRaster = fp,
             feature_name = transform["feature_name"],
-            band = int(transform["band"] if "band" in transform and transform["band"] != "" else "0"),
-            nodataval = int(transform["null_val"]),
-            date = d,
-            band_name = transform["band_name"],
-            bands = transform["bands"] if "bands" in transform else None
+            band         = int(transform["band"] if "band" in transform and transform["band"] != "" else "0"),
+            nodataval    = int(transform["null_val"]),
+            date         = transform["date"] if ("date" in transform and transform["date"] != "") else None,
+            band_name    = transform["band_name"],
+            bands        = transform["bands"] if "bands" in transform else None,
+            band_type    = transform["band_type"] if "band_type" in transform else "category"
         )
     elif ftype == 'excel':
         df = pd.read_excel(fp, transform['sheet'])
@@ -1296,7 +1292,9 @@ def raster2df(
     nodataval: int = -9999,
     date: str = None,
     band_name: str = "feature2",
-    bands: dict = None
+    bands: dict = None,
+    band_type: str = 'category'
+
 ) -> pd.DataFrame:
     """
     Description
@@ -1320,6 +1318,8 @@ def raster2df(
     bands: dict, default None
         passed in meta; dictionary of band identifiers and specifies bands to 
         be processed.
+    band_type: str, default category
+        Specifies band type e.g. category or datetime. If datetime, this data goes into the date column.
 
     Examples
     --------
@@ -1334,22 +1334,20 @@ def raster2df(
     ColRange = range(ds.RasterXSize)
     RowRange = range(ds.RasterYSize)
 
-    if band == 0 and bands:
-        # TODO Will someone import a raster but not use all bands?
-        #assert(len(bands) == ds.RasterCount)
-        pass
-
     # Cache the dataframe and value data type.
     df = pd.DataFrame()
     row_data_type = None
 
+    # Create columns for the dataframe.
     if bands == None:
         columns = ["longitude", "latitude", feature_name]
+    elif band_type == 'datetime':
+        columns=["longitude", "latitude", 'date', feature_name]
     else:
         columns=["longitude", "latitude", feature_name, band_name]
 
     for x in range(1, ds.RasterCount+1):
-        # If band has a value, then limit import to single band.
+        # If band has a value, then limit import to the single specified band.
         if band > 0 and band != x:
             continue
 
@@ -1413,8 +1411,11 @@ def raster2df(
                     X += HalfX
                     Y += HalfY
 
+                    # Add the data row to the dataframe.
                     if bands == None:
                         points.append([X, Y, row_value])
+                    elif band_type == 'datetime':
+                        points.append([X, Y, band_value, row_value])
                     else:
                         points.append([X, Y, row_value, band_value])
 
@@ -1428,7 +1429,7 @@ def raster2df(
             df = df.append(new_df)
 
     # Add the date from the mapper.
-    if date:
+    if (date and band_type != 'datetime'):
         df["date"] = date
 
     df.sort_values(by=columns, inplace=True)
