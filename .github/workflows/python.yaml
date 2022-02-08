@@ -9,19 +9,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: [3.6, 3.7, 3.8]
+
     steps:
       - uses: actions/checkout@v2
-      - name: Setup Python
-        uses: actions/setup-python@v1
-        with:
-          python-version: ${{ matrix.python }}
 
-      - name: Install Dependencies
-        run: pip install -r requirements.txt
+      - name: Build
+        run: docker build -t mixmasta .
 
-      - name: Build Action Scripts
-        working-directory: ./tests
-        run: python -m unittest test_mixmasta.py -v
+      - name: Run tests
+        run: docker run -it -w=/tests --entrypoint="python3" mixmasta -m unittest test_mixmasta.py -v
+
