@@ -17,5 +17,5 @@ jobs:
         run: docker build -t mixmasta .
 
       - name: Run tests
-        run: docker run -it -w=/tests --entrypoint="python3" mixmasta -m unittest test_mixmasta.py -v
+        run: docker run -w=/tests --entrypoint="python3" mixmasta -m unittest test_mixmasta.py -v
 
