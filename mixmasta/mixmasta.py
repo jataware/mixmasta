@@ -1337,7 +1337,7 @@ def raster2df(
     # Cache the dataframe and value data type.
     df = pd.DataFrame()
     row_data_type = None
-
+    
     for x in range(1, ds.RasterCount+1):
         # If band has a value, then limit import to the single specified band.
         if band > 0 and band != x:
@@ -1345,21 +1345,32 @@ def raster2df(
 
         # If no bands in meta, then single-band and use band_name
         # If bands, then process only those in the meta.
-        if bands == None:
+        if not bands:
             band_value = band_name
+            logging.info(f"Single band detected. Bands: {bands}, band_name: {band_name}, feature_name: {feature_name}")
         elif str(x) in bands:
-            band_value = bands[str(x)] 
-        else:
+            band_value = bands[str(x)]
+            logging.info(f"Multi-band detected Bands: {bands}, band_name: {band_name}, feature_name: {feature_name}")
+        elif str(x) not in bands:
+            # Processing a band not specified in the meta, so skip it
+            logging.info(f"Skipping band {x} since it is not specified in {bands}.")
             continue
+        else:
+            raise Exception(f"Neither single nor multiple bands specified in meta. Current band: {x}, Bands: {bands}, band_name: {band_name}, feature_name: {feature_name}")
 
         # Create columns for the dataframe.
-        if bands == None:
+        if not bands:
             columns = ["longitude", "latitude", feature_name]
+            logging.info(f"Single band detected. Columns are: {columns}")
         elif band_type == 'datetime':
             columns=["longitude", "latitude", 'date', feature_name]
-        else:
-            # Add columns during processing.
+            logging.info(f"Datetime multiband detected. Columns are: {columns}")
+        elif band_type == 'category':
+            # categorical multi-band; add columns during processing.
             columns=["longitude", "latitude", band_value]
+            logging.info(f"Categorical multiband detected. Columns are: {columns}")
+        else:
+            raise Exception(f"During column processing, neither single nor multiple bands specified in meta. Bands: {bands}, band_name: {band_name}, feature_name: {feature_name}")
                 
         rBand = ds.GetRasterBand(x)  
         nData = rBand.GetNoDataValue()
