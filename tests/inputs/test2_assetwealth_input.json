@@ -23,8 +23,8 @@
     "date":
     [
         {
-            "name": "year",
-            "display_name": "year",
+            "name": "date",
+            "display_name": "date",
             "description": "date",
             "type": "date",
             "date_type": "year",
@@ -39,24 +39,6 @@
 
             ],
             "primary_date": true
-        },
-		{
-            "name": "date",
-            "display_name": "date",
-            "description": "date",
-            "type": "date",
-            "date_type": "year",
-            "dateassociation": false,
-            "time_format": "%m/%d/%Y",
-            "associated_columns":
-            {
-
-            },
-            "qualifies":
-            [
-
-            ],
-            "primary_date": false
         }
     ],
     "feature":
@@ -74,11 +56,11 @@
     "meta":
     {
         "ftype": "geotiff",
-        "date": "12/29/2004",
         "feature_name": "asset wealth",
         "band": "",
         "null_val": 0,
-		"band_name": "year",
+		"band_name": "date",
+        "band_type": "datetime",
 		"bands":{
 			"1": 2018,
 			"2": 2019,
