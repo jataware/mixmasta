@@ -1,4 +1,5 @@
 # mixmasta
+[![Python Tests](https://github.com/jataware/mixmasta/actions/workflows/python.yaml/badge.svg)](https://github.com/jataware/mixmasta/actions/workflows/python.yaml)
 
 A library for common scientific model transforms. This library enables fast and intuitive transforms including:
 

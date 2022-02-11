@@ -1218,19 +1218,15 @@ def process(fp: str, mp: str, admin: str, output_file: str, write_output = True,
 
     ftype = transform["ftype"]
     if ftype == "geotiff":
-        if transform["date"] == "":
-            d = None
-        else:
-            d = transform["date"]
-
         df = raster2df(
             InRaster = fp,
             feature_name = transform["feature_name"],
-            band = int(transform["band"] if "band" in transform and transform["band"] != "" else "0"),
-            nodataval = int(transform["null_val"]),
-            date = d,
-            band_name = transform["band_name"],
-            bands = transform["bands"] if "bands" in transform else None
+            band         = int(transform["band"] if "band" in transform and transform["band"] != "" else "0"),
+            nodataval    = int(transform["null_val"]),
+            date         = transform["date"] if ("date" in transform and transform["date"] != "") else None,
+            band_name    = transform["band_name"],
+            bands        = transform["bands"] if "bands" in transform else None,
+            band_type    = transform["band_type"] if "band_type" in transform else "category"
         )
     elif ftype == 'excel':
         df = pd.read_excel(fp, transform['sheet'])
@@ -1296,7 +1292,9 @@ def raster2df(
     nodataval: int = -9999,
     date: str = None,
     band_name: str = "feature2",
-    bands: dict = None
+    bands: dict = None,
+    band_type: str = 'category'
+
 ) -> pd.DataFrame:
     """
     Description
@@ -1320,6 +1318,8 @@ def raster2df(
     bands: dict, default None
         passed in meta; dictionary of band identifiers and specifies bands to 
         be processed.
+    band_type: str, default category
+        Specifies band type e.g. category or datetime. If datetime, this data goes into the date column.
 
     Examples
     --------
@@ -1334,35 +1334,45 @@ def raster2df(
     ColRange = range(ds.RasterXSize)
     RowRange = range(ds.RasterYSize)
 
-    if band == 0 and bands:
-        # TODO Will someone import a raster but not use all bands?
-        #assert(len(bands) == ds.RasterCount)
-        pass
-
     # Cache the dataframe and value data type.
     df = pd.DataFrame()
     row_data_type = None
-
-    if bands == None:
-        columns = ["longitude", "latitude", feature_name]
-    else:
-        columns=["longitude", "latitude", feature_name, band_name]
-
+    
     for x in range(1, ds.RasterCount+1):
-        # If band has a value, then limit import to single band.
+        # If band has a value, then limit import to the single specified band.
         if band > 0 and band != x:
             continue
 
         # If no bands in meta, then single-band and use band_name
         # If bands, then process only those in the meta.
-        if bands == None:
+        if not bands:
             band_value = band_name
+            logging.info(f"Single band detected. Bands: {bands}, band_name: {band_name}, feature_name: {feature_name}")
         elif str(x) in bands:
-            band_value = bands[str(x)] 
-        else:
+            band_value = bands[str(x)]
+            logging.info(f"Multi-band detected Bands: {bands}, band_name: {band_name}, feature_name: {feature_name}")
+        elif str(x) not in bands:
+            # Processing a band not specified in the meta, so skip it
+            logging.info(f"Skipping band {x} since it is not specified in {bands}.")
             continue
+        else:
+            raise Exception(f"Neither single nor multiple bands specified in meta. Current band: {x}, Bands: {bands}, band_name: {band_name}, feature_name: {feature_name}")
+
+        # Create columns for the dataframe.
+        if not bands:
+            columns = ["longitude", "latitude", feature_name]
+            logging.info(f"Single band detected. Columns are: {columns}")
+        elif band_type == 'datetime':
+            columns=["longitude", "latitude", 'date', feature_name]
+            logging.info(f"Datetime multiband detected. Columns are: {columns}")
+        elif band_type == 'category':
+            # categorical multi-band; add columns during processing.
+            columns=["longitude", "latitude", band_value]
+            logging.info(f"Categorical multiband detected. Columns are: {columns}")
+        else:
+            raise Exception(f"During column processing, neither single nor multiple bands specified in meta. Bands: {bands}, band_name: {band_name}, feature_name: {feature_name}")
                 
-        rBand = ds.GetRasterBand(x)  # (band) # first band
+        rBand = ds.GetRasterBand(x)  
         nData = rBand.GetNoDataValue()
 
         if nData == None:
@@ -1406,17 +1416,18 @@ def raster2df(
                     # if (RowData[ThisCol] <= 100) and (RowData[ThisCol] >= -100):
 
                     X = GeoTrans[0] + (ThisCol * GeoTrans[1])
-                    Y = GeoTrans[3] + (
-                        ThisRow * GeoTrans[5]
-                    )  # Y is negative so it's a minus
+                    Y = GeoTrans[3] + (ThisRow * GeoTrans[5])  # Y is negative so it's a minus
                     # this gives the upper left of the cell, offset by half a cell to get centre
                     X += HalfX
                     Y += HalfY
 
+                    # Add the data row to the dataframe.
                     if bands == None:
                         points.append([X, Y, row_value])
+                    elif band_type == 'datetime':
+                        points.append([X, Y, band_value, row_value])
                     else:
-                        points.append([X, Y, row_value, band_value])
+                        points.append([X, Y, row_value])
 
         # This will make all floats float64, but will be optimized in process().
         new_df = pd.DataFrame(points, columns=columns)
@@ -1425,10 +1436,14 @@ def raster2df(
             df = new_df
         else:
             #df = df.merge(new_df, left_on=["longitude", "latitude"], right_on=["longitude", "latitude"])
-            df = df.append(new_df)
+            if (bands and band_type != 'datetime'):
+                #df.join(new_df, on=["longitude", "latitude"])
+                df = df.merge(new_df, left_on=["longitude", "latitude"], right_on=["longitude", "latitude"])
+            else:
+                df = df.append(new_df)
 
     # Add the date from the mapper.
-    if date:
+    if (date and band_type != 'datetime'):
         df["date"] = date
 
     df.sort_values(by=columns, inplace=True)
