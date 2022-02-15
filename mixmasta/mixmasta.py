@@ -584,7 +584,11 @@ def match_geo_names(admin: str, df: pd.DataFrame, resolve_to_gadm_geotypes: list
         gadm_country_list = gadm["country"].unique()
         unknowns = df[~df.country.isin(gadm_country_list)].country.tolist()
         for unk in unknowns:
-            match = fuzzywuzzy.process.extractOne(unk, gadm_country_list, scorer=fuzz.partial_ratio)
+            try:
+                match = fuzzywuzzy.process.extractOne(unk, gadm_country_list, scorer=fuzz.partial_ratio)
+            except Exception as e:
+                match = None
+                logging.error(f"Error in match_geo_names: {e}")
             if match != None:
                 df.loc[df.country == unk, 'country'] = match[0]
 
