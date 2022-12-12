@@ -39,7 +39,7 @@ setup(
             "mixmasta=mixmasta.cli:cli",
         ],
     },
-    setup_requires=["numpy>=1.20.1"],  # This is not working as expected
+    setup_requires=["numpy>=1.20.1", "setuptools<58.0.0"],
     install_requires=install_requirements,
     license="MIT license",
     long_description=readme + "\n\n" + history,
