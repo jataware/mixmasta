@@ -51,6 +51,6 @@ setup(
     packages=find_packages(include=["mixmasta", "mixmasta.*"]),
     test_suite="tests",
     url="https://github.com/jataware/mixmasta",
-    version='0.6.7',
+    version='0.6.8',
     zip_safe=False,
 )
