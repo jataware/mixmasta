@@ -39,7 +39,7 @@ setup(
             "mixmasta=mixmasta.cli:cli",
         ],
     },
-    setup_requires=["numpy>=1.20.1", "setuptools<58.0.0"],
+    setup_requires=["setuptools<58.0.0"],
     install_requires=install_requirements,
     license="MIT license",
     long_description=readme + "\n\n" + history,
@@ -51,6 +51,6 @@ setup(
     packages=find_packages(include=["mixmasta", "mixmasta.*"]),
     test_suite="tests",
     url="https://github.com/jataware/mixmasta",
-    version='0.6.6',
+    version='0.6.7',
     zip_safe=False,
 )
