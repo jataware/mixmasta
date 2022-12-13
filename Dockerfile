@@ -23,7 +23,7 @@ RUN apt install -y python3-rtree
 ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
 ENV C_INCLUDE_PATH=/usr/include/gdal
 
-RUN pip3 install numpy>=1.20.1
+RUN pip3 install numpy==1.22
 
 WORKDIR /
 COPY requirements.txt /requirements.txt

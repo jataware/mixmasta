@@ -8,7 +8,7 @@ GDAL==3.1.4
 geofeather>=0.3.0
 geopandas==0.8.1
 netCDF4==1.5.3
-numpy==1.20.3
+numpy==1.22
 openpyxl==3.0.7
 pip>=21.1
 pydantic>=1.8.2
