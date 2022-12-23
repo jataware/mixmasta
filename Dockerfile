@@ -32,4 +32,4 @@ COPY . /
 RUN python3 setup.py install
 #RUN mixmasta download
 
-ENTRYPOINT ["mixmasta"]
+# ENTRYPOINT ["mixmasta"]
