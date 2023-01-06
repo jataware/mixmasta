@@ -6,11 +6,9 @@ import click
 import pandas as pd
 
 from .download import download_and_clean
-from .mixmasta import geocode, process, normalizer, optimize_df_types, mixdata
+from .mixmasta import normalizer, optimize_df_types, mixdata
 from .file_processor import netcdf2df, raster2df
-
-# from download import download_and_clean
-# from mixmasta import geocode, netcdf2df, process, raster2df, normalizer, optimize_df_types, mixdata
+from .normalizer import geocode
 
 from glob import glob
 import numpy as np

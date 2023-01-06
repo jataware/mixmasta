@@ -1,53 +1,16 @@
 """Main module."""
 import json
 import logging
-import click
 import os
 import sys
-from datetime import datetime
-from typing import List
 
 import geofeather as gf
-import geopandas as gpd
 import numpy as np
 import pandas as pd
-from pandas.core.frame import DataFrame
-import requests
-import xarray as xr
-from osgeo import gdal, gdalconst
-from shapely import speedups
 
-
-import fuzzywuzzy
-from fuzzywuzzy import fuzz
-from fuzzywuzzy import process
-import timeit
-
+from . import constants
 from .file_processor import process_file_by_filetype
 from .normalizer import normalizer
-
-# from .spacetag_schema import SpaceModel
-
-# TODO Remove this into another file.
-# Constants
-COL_ORDER = [
-    "timestamp",
-    "country",
-    "admin1",
-    "admin2",
-    "admin3",
-    "lat",
-    "lng",
-    "feature",
-    "value",
-]
-
-import click
-
-GEO_TYPE_COUNTRY = "country"
-GEO_TYPE_ADMIN1 = "state/territory"
-GEO_TYPE_ADMIN2 = "county/district"
-GEO_TYPE_ADMIN3 = "municipality/town"
 
 if not sys.warnoptions:
     import warnings
@@ -55,182 +18,6 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
 logger = logging.getLogger(__name__)
-
-
-def audit_renamed_col_dict(dct: dict) -> dict:
-    """
-    Description
-    -----------
-    Handle edge cases where a col could be renamed back to itself.
-    example: no primary_geo, but country is present. Because it is a protected
-    col name, it would be renamed country_non_primary. Later, it would be set
-    as primary_geo country, and the pair added to renamed_col_dict again:
-    {'country_non_primary' : ['country'], "country": ['country_non_primary'] }
-
-    Parameters
-    ----------
-    dct: dict
-        renamed_col_dict of key: new column name, value: list of old columns
-
-    Output
-    ------
-    dict:
-        The modified parameter dict.
-    """
-    remove_these = set()
-    for k, v in dct.items():
-        vstr = "".join(v)
-        if vstr in dct.keys() and [k] in dct.values():
-            remove_these.add(vstr)
-            remove_these.add(k)
-
-    for k in remove_these:
-        dct.pop(k, None)
-
-    return dct
-
-
-def match_geo_names(
-    admin: str,
-    df: pd.DataFrame,
-    resolve_to_gadm_geotypes: list,
-    gadm: gpd.GeoDataFrame = None,
-) -> pd.DataFrame:
-    """
-    Assumption
-    ----------
-    Country was selected by drop-down on file submission, column "country"
-    is present in the data frame, and lng/lat is not being used for geocoding.
-
-    Parameters
-    ----------
-    admin: str
-        the level to geocode to. Either 'admin2' or 'admin3'
-    df: pandas.DataFrame
-        the uploaded dataframe
-    resolve_to_gadm_geotypes:
-        list of geotypes marked resolve_to_gadm = True e.g. ["admin1", "country"]
-    gadm: gpd.GeoDataFrame, default None
-        optional specification of a GeoDataFrame of GADM shapes of the appropriate
-        level (admin2/3) for geocoding
-
-    Result
-    ------
-    A pandas.Dataframe produced by modifying the parameter df.
-
-    """
-    print("geocoding ...")
-    flag = speedups.available
-    if flag == True:
-        speedups.enable()
-
-    cdir = os.path.expanduser("~")
-    download_data_folder = f"{cdir}/mixmasta_data"
-
-    # only load GADM if it wasn't explicitly passed to the function.
-    if gadm is not None:
-        # logging.info("GADM geo dataframe has been provided.")
-        pass
-    else:
-        logging.info("GADM has not been provided; loading now.")
-
-        if admin == "admin2":
-            gadm_fn = f"gadm36_2.feather"
-        else:
-            gadm_fn = f"gadm36_3.feather"
-
-        gadmDir = f"{download_data_folder}/{gadm_fn}"
-        gadm = gf.from_geofeather(gadmDir)
-
-        gadm["country"] = gadm["NAME_0"]
-        gadm["state"] = gadm["NAME_1"]
-        gadm["admin1"] = gadm["NAME_1"]
-        gadm["admin2"] = gadm["NAME_2"]
-
-        if admin == "admin2":
-            gadm = gadm[["country", "state", "admin1", "admin2"]]
-        else:
-            gadm["admin3"] = gadm["NAME_3"]
-            gadm = gadm[["country", "state", "admin1", "admin2", "admin3"]]
-
-    # Filter GADM for countries in df.
-    countries = df["country"].unique()
-
-    # Correct country names.
-    if GEO_TYPE_COUNTRY in resolve_to_gadm_geotypes:
-        gadm_country_list = gadm["country"].unique()
-        unknowns = df[~df.country.isin(gadm_country_list)].country.tolist()
-        for unk in unknowns:
-            try:
-                match = fuzzywuzzy.process.extractOne(
-                    unk, gadm_country_list, scorer=fuzz.partial_ratio
-                )
-            except Exception as e:
-                match = None
-                logging.error(f"Error in match_geo_names: {e}")
-            if match != None:
-                df.loc[df.country == unk, "country"] = match[0]
-
-    # Filter GADM dicitonary for only those countries (ie. speed up)
-    gadm = gadm[gadm["country"].isin(countries)]
-
-    # Loop by country using gadm dict filtered for that country.
-    for c in countries:
-        # The following ignores admin1 / admin2 pairs; it only cares if those
-        # values exist for the appropriate country.
-
-        # Get list of admin1 values in df but not in gadm. Reduce list for country.
-        if GEO_TYPE_ADMIN1 in resolve_to_gadm_geotypes:
-            admin1_list = gadm[gadm.country == c]["admin1"].unique()
-            if admin1_list is not None and all(admin1_list) and "admin1" in df:
-                unknowns = df[
-                    (df.country == c) & ~df.admin1.isin(admin1_list)
-                ].admin1.tolist()
-                unknowns = [
-                    x for x in unknowns if pd.notnull(x) and x.strip()
-                ]  # remove Nan
-                for unk in unknowns:
-                    match = fuzzywuzzy.process.extractOne(
-                        unk, admin1_list, scorer=fuzz.partial_ratio
-                    )
-                    if match != None:
-                        df.loc[df.admin1 == unk, "admin1"] = match[0]
-
-        # Get list of admin2 values in df but not in gadm. Reduce list for country.
-        if GEO_TYPE_ADMIN2 in resolve_to_gadm_geotypes:
-            admin2_list = gadm[gadm.country == c]["admin2"].unique()
-            if admin2_list is not None and all(admin2_list) and "admin2" in df:
-                unknowns = df[
-                    (df.country == c) & ~df.admin2.isin(admin2_list)
-                ].admin2.tolist()
-                unknowns = [
-                    x for x in unknowns if pd.notnull(x) and x.strip()
-                ]  # remove Nan
-                for unk in unknowns:
-                    match = fuzzywuzzy.process.extractOne(
-                        unk, admin2_list, scorer=fuzz.partial_ratio
-                    )
-                    if match != None:
-                        df.loc[df.admin2 == unk, "admin2"] = match[0]
-
-        if admin == "admin3" and GEO_TYPE_ADMIN3 in resolve_to_gadm_geotypes:
-            # Get list of admin3 values in df but not in gadm. Reduce list for country.
-            admin3_list = gadm[gadm.country == c]["admin3"].unique()
-            if admin3_list is not None and all(admin3_list) and "admin3" in df:
-                unknowns = df[
-                    (df.country == c) & ~df.admin3.isin(admin3_list)
-                ].admin3.tolist()
-                unknowns = [
-                    x for x in unknowns if pd.notnull(x) and x.strip()
-                ]  # remove Nan
-                for unk in unknowns:
-                    match = fuzzywuzzy.process.extractOne(
-                        unk, admin3_list, scorer=fuzz.partial_ratio
-                    )
-                    if match != None:
-                        df.loc[df.admin3 == unk, "admin3"] = match[0]
-
-    return df
 
 
 def optimize_df_types(df: pd.DataFrame):
@@ -314,7 +101,7 @@ def process(
     if write_output:
         # If any qualify columns were added, the feature_type must be enforced
         # here because pandas will have cast strings as ints etc.
-        qualify_cols = set(norm.columns).difference(set(COL_ORDER))
+        qualify_cols = set(norm.columns).difference(set(constants.COL_ORDER))
         for col in qualify_cols:
             for feature_dict in mapper["feature"]:
                 if (
