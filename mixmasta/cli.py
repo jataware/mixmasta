@@ -1,6 +1,4 @@
 import os
-import sys
-from datetime import datetime
 
 import click
 import pandas as pd
@@ -8,7 +6,7 @@ import pandas as pd
 from .download import download_and_clean
 from .mixmasta import normalizer, optimize_df_types, mixdata
 from .file_processor import netcdf2df, raster2df
-from .normalizer import geocode
+from .geo_processor import geocode
 
 from glob import glob
 import numpy as np

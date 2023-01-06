@@ -105,9 +105,8 @@ def raster2df(
     ColRange = range(data_source.RasterXSize)
     RowRange = range(data_source.RasterYSize)
 
-    # Cache the dataframe and value data type.
+    # Creating variables for the dataframe and value data type.
     dataframe = pandas.DataFrame()
-    row_data_type = None
 
     for x in range(1, data_source.RasterCount + 1):
         # If band has a value, then limit import to the single specified band.

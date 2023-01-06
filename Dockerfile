@@ -3,7 +3,7 @@ RUN apt-get update && apt-get install -y \
       software-properties-common \
       sudo \
       unzip \
-      wget 
+      wget
 
 RUN wget https://jataware-world-modelers.s3.amazonaws.com/gadm/gadm36_2.feather.zip && \
       wget https://jataware-world-modelers.s3.amazonaws.com/gadm/gadm36_3.feather.zip && \
