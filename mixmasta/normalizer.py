@@ -3,6 +3,7 @@
 Returns:
     Tuple(pandas.Dataframe, dict, pandas.Dataframe): _description_
 """
+from datetime import datetime
 import logging
 import os
 
@@ -100,30 +101,34 @@ def normalizer(
 
     # list of names of datetime columns primary_date=True
     primary_time_cols = [
-        k["name"]
-        for k in mapper["date"]
-        if "primary_date" in k and k["primary_date"] == True
+        date_annotation_dict["name"]
+        for date_annotation_dict in mapper["date"]
+        if "primary_date" in date_annotation_dict
+        and date_annotation_dict["primary_date"] == True
     ]
 
     # list of names of datetime columns no primary_date or primary_date = False
     other_time_cols = [
-        k["name"]
-        for k in mapper["date"]
-        if "primary_date" not in k or k["primary_date"] == False
+        date_annotation_dict["name"]
+        for date_annotation_dict in mapper["date"]
+        if "primary_date" not in date_annotation_dict
+        or date_annotation_dict["primary_date"] == False
     ]
 
     # list of names of geo columns primary_geo=True
     primary_geo_cols = [
-        k["name"]
-        for k in mapper["geo"]
-        if "primary_geo" in k and k["primary_geo"] == True
+        geo_annotation_dict["name"]
+        for geo_annotation_dict in mapper["geo"]
+        if "primary_geo" in geo_annotation_dict
+        and geo_annotation_dict["primary_geo"] == True
     ]
 
     # list of geotypes of geo columns primary_geo=True (used for match_geo_names logic below)
     primary_geo_types = [
-        k["geo_type"]
-        for k in mapper["geo"]
-        if "primary_geo" in k and k["primary_geo"] == True
+        geo_annotation_dict["geo_type"]
+        for geo_annotation_dict in mapper["geo"]
+        if "primary_geo" in geo_annotation_dict
+        and geo_annotation_dict["primary_geo"] == True
     ]
 
     # qualified_col_dict: dictionary for columns qualified by another column.
@@ -146,33 +151,33 @@ def normalizer(
     other_date_group_mapper = {}
 
     for date_dict in mapper["date"]:
-        kk = date_dict["name"]
-        if kk in primary_time_cols:
+        date_annotation_name = date_dict["name"]
+        if date_annotation_name in primary_time_cols:
             # There should only be a single epoch or date field, or a single
             # group of year/month/day/minute/second marked as primary_time in
             # the loaded schema.
             if date_dict["date_type"] == "date":
                 # convert primary_time of date_type date to epochtime and rename as 'timestamp'
-                df.loc[:, kk] = df[kk].apply(
+                df.loc[:, date_annotation_name] = df[date_annotation_name].apply(
                     lambda x: format_time(
                         str(x), date_dict["time_format"], validate=False
                     )
                 )
                 staple_col_name = "timestamp"
-                df.rename(columns={kk: staple_col_name}, inplace=True)
+                df.rename(columns={date_annotation_name: staple_col_name}, inplace=True)
                 # renamed_col_dict[ staple_col_name ] = [kk] # 7/2/2021 do not include primary cols
             elif date_dict["date_type"] == "epoch":
                 # rename epoch time column as 'timestamp'
                 staple_col_name = "timestamp"
-                df.rename(columns={kk: staple_col_name}, inplace=True)
+                df.rename(columns={date_annotation_name: staple_col_name}, inplace=True)
                 # renamed_col_dict[ staple_col_name ] = [kk] # 7/2/2021 do not include primary cols
             elif date_dict["date_type"] in ["day", "month", "year"]:
-                primary_date_group_mapper[kk] = date_dict
+                primary_date_group_mapper[date_annotation_name] = date_dict
 
         else:
             if date_dict["date_type"] == "date":
                 # Convert all date/time to epoch time if not already.
-                df.loc[:, kk] = df[kk].apply(
+                df.loc[:, date_annotation_name] = df[date_annotation_name].apply(
                     lambda x: format_time(
                         str(x), date_dict["time_format"], validate=False
                     )
@@ -181,11 +186,11 @@ def normalizer(
                 # primary_time timestamp column, and keep as a feature so the
                 # column_name meaning is not lost.
                 if not primary_time_cols and not "timestamp" in df.columns:
-                    df.rename(columns={kk: "timestamp"}, inplace=True)
+                    df.rename(columns={date_annotation_name: "timestamp"}, inplace=True)
                     staple_col_name = "timestamp"
-                    renamed_col_dict[staple_col_name] = [kk]
+                    renamed_col_dict[staple_col_name] = [date_annotation_name]
                 # All not primary_time, not associated_columns fields are pushed to features.
-                features.append(kk)
+                features.append(date_annotation_name)
 
             elif (
                 date_dict["date_type"] in MONTH_DAY_YEAR
@@ -196,10 +201,10 @@ def normalizer(
                 # convert them to epoch then store them as a feature
                 # (instead of storing them as separate uncombined features).
                 # handle this dict after iterating all date fields
-                other_date_group_mapper[kk] = date_dict
+                other_date_group_mapper[date_annotation_name] = date_dict
 
             else:
-                features.append(kk)
+                features.append(date_annotation_name)
 
         if "qualifies" in date_dict and date_dict["qualifies"]:
             # Note that any "qualifier" column that is not primary geo/date
@@ -211,11 +216,11 @@ def normalizer(
             # e.g. "name": "region", "qualifies": ["probability", "color"]
             # should produce two dict entries for prob and color, with region
             # in a list as the value for both.
-            for k in date_dict["qualifies"]:
-                if k in qualified_col_dict:
-                    qualified_col_dict[k].append(kk)
+            for qualified_column in date_dict["qualifies"]:
+                if qualified_column in qualified_col_dict:
+                    qualified_col_dict[qualified_column].append(date_annotation_name)
                 else:
-                    qualified_col_dict[k] = [kk]
+                    qualified_col_dict[qualified_column] = [date_annotation_name]
 
     if primary_date_group_mapper:
         # Applied when there were primary_date year,month,day fields above.
@@ -249,6 +254,7 @@ def normalizer(
 
         # Pop the first item in the mapper and begin building that date set.
         date_field_tuple = other_date_group_mapper.popitem()
+        print(f"DEBUG: {date_field_tuple}")
 
         # Build a list of column names associated with the the popped date field.
         assoc_fields = [k[1] for k in date_field_tuple[1]["associated_columns"].items()]
