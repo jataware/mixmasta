@@ -18,6 +18,7 @@ from .time_processor import (
     generate_timestamp_format,
 )
 from .geo_processor import geocode, get_iso_country_dict, match_geo_names
+from .time_processor import build_date_qualifies_field
 
 
 def normalizer(
@@ -82,9 +83,6 @@ def normalizer(
         "lat",
         "lng",
     ]
-
-    # List of date_types that be used to build a date.
-    MONTH_DAY_YEAR = ["day", "month", "year"]
 
     # Create a dictionary of list: colnames: new col name, and modify df and
     # mapper for any column name collisions.
@@ -188,7 +186,7 @@ def normalizer(
                 features.append(date_annotation_name)
 
             elif (
-                date_dict["date_type"] in MONTH_DAY_YEAR
+                date_dict["date_type"] in constants.MONTH_DAY_YEAR
                 and "associated_columns" in date_dict
                 and date_dict["associated_columns"]
             ):
@@ -297,7 +295,7 @@ def normalizer(
         # convert to epoch time only if all three date components (day, month,
         # year) are present; otherwise leave as a date string.
         date_types = [v["date_type"] for k, v in assoc_columns_dict.items()]
-        if len(frozenset(date_types).intersection(MONTH_DAY_YEAR)) == 3:
+        if len(frozenset(date_types).intersection(constants.MONTH_DAY_YEAR)) == 3:
             time_formatter = generate_timestamp_format(assoc_columns_dict)
             df.loc[:, new_column_name] = df[new_column_name].apply(
                 lambda x: format_time(str(x), time_formatter, validate=False)

@@ -2,21 +2,23 @@ from datetime import datetime
 
 import pandas
 
+from . import constants
 
-def format_time(t: str, time_format: str, validate: bool = True) -> int:
+
+def format_time(time: str, time_format: str, validate: bool = True) -> int:
     """
     Description
     -----------
-    Converts a time feature (t) into epoch time using `time_format` which is a strftime definition
+    Converts a time feature (time) into epoch time using `time_format` which is a strftime definition
 
     Parameters
     ----------
-    t: str
+    time: str
         the time string
     time_format: str
-        the strftime format for the string t
+        the strftime format for the string 'time'
     validate: bool, default True
-        whether to error check the time string t. Is set to False, then no error is raised if the date fails to parse, but None is returned.
+        whether to error check the time string 'time'. Is set to False, then no error is raised if the date fails to parse, but None is returned.
 
     Examples
     --------
@@ -25,19 +27,19 @@ def format_time(t: str, time_format: str, validate: bool = True) -> int:
     """
 
     try:
-        t_ = (
-            int(datetime.strptime(t, time_format).timestamp()) * 1000
+        time_ = (
+            int(datetime.strptime(time, time_format).timestamp()) * 1000
         )  # Want milliseonds
-        return t_
+        return time_
     except Exception as e:
-        if t.endswith(" 00:00:00"):
+        if time.endswith(" 00:00:00"):
             # Depending on the date format, pandas.read_excel will read the
             # date as a Timestamp, so here it is a str with format
             # '2021-03-26 00:00:00'. For now, handle this single case until
             # there is time for a more comprehensive solution e.g. add a custom
             # date_parser function that doesn't parse diddly/squat to
             # pandas.read_excel() in process().
-            return format_time(t.replace(" 00:00:00", ""), time_format, validate)
+            return format_time(time.replace(" 00:00:00", ""), time_format, validate)
         print(e)
         if validate:
             raise Exception(e)
@@ -181,3 +183,98 @@ def build_date_qualifies_field(qualified_col_dict: dict, assoc_fields: list) -> 
             return k
 
     return None
+
+
+def day_month_year_converter(other_date_group_mapper):
+    # Various date columns have been associated by the user and are not primary_date.
+    # Convert to epoch time and store as a feature, do not store these separately in features.
+    # Exception is the group is only two of day, month, year: leave as date.
+    # Control for possibility of more than one set of assciated_columns.
+
+    # Pop the first item in the mapper and begin building that date set.
+    date_field_tuple = other_date_group_mapper.popitem()
+    print(f"DEBUG: {date_field_tuple}")
+
+    # Build a list of column names associated with the the popped date field.
+    assoc_fields = [k[1] for k in date_field_tuple[1]["associated_columns"].items()]
+
+    # Pop those mapper objects into a dict based on the column name keys in
+    # assocfields list.
+    assoc_columns_dict = {
+        f: other_date_group_mapper.pop(f)
+        for f in assoc_fields
+        if f in other_date_group_mapper
+    }
+
+    # Add the first popped tuple into the assoc_columns dict where the key is the
+    # first part of the tuple; the value is the 2nd part.
+    assoc_columns_dict[date_field_tuple[0]] = date_field_tuple[1]
+
+    # Add the first popped tuple column name to the list of associated fields.
+    assoc_fields.append(date_field_tuple[0])
+
+    # TODO: If day and year are associated to each other and month, but
+    # month is not associated to those fields, then at this point assoc_fields
+    # will be the three values, and assoc_columns will contain only day and
+    # year. This will error out below. It is assumed that SpaceTag will
+    # control for this instance.
+
+    # If there is no primary_time column for timestamp, which would have
+    # been created above with primary_date_group_mapper, or farther above
+    # looping mapper["date"], attempt to generate from date_type = Month,
+    # Day, Year features. Otherwise, create a new column name from the
+    # concatenation of the associated date fields here.
+    if not "timestamp" in df.columns:
+        new_column_name = "timestamp"
+    else:
+        new_column_name = generate_column_name(assoc_fields)
+
+    # Create a separate df of the associated date fields. This avoids
+    # pandas upcasting the series dtypes on df.apply(); e.g., int to float,
+    # or a month 9 to 9.0, which breaks generate_timestamp()
+    date_df = df[assoc_fields]
+
+    # Now generate the timestamp from date_df and add timestamp col to df.
+    df = generate_timestamp_column(df, assoc_columns_dict, new_column_name)
+
+    # Determine the correct time format for the new date column, and
+    # convert to epoch time only if all three date components (day, month,
+    # year) are present; otherwise leave as a date string.
+    date_types = [v["date_type"] for k, v in assoc_columns_dict.items()]
+    if len(frozenset(date_types).intersection(constants.MONTH_DAY_YEAR)) == 3:
+        time_formatter = generate_timestamp_format(assoc_columns_dict)
+        df.loc[:, new_column_name] = df[new_column_name].apply(
+            lambda x: format_time(str(x), time_formatter, validate=False)
+        )
+
+    # Let SpaceTag know those date columns were renamed to a new column.
+    renamed_col_dict[new_column_name] = assoc_fields
+
+    # timestamp is a protected column, so don't add to features.
+    if new_column_name != "timestamp":
+        # Handle edge case of each date field in assoc_fields qualifying
+        # the same column e.g. day/month/year are associated and qualify
+        # a field. In this case, the new_column_name
+        qualified_col = build_date_qualifies_field(qualified_col_dict, assoc_fields)
+        if qualified_col is None:
+            features.append(new_column_name)
+        else:
+            qualified_col_dict[qualified_col] = [new_column_name]
+
+
+def generate_column_name(field_list: list) -> str:
+    """
+    Description
+    -----------
+    Contatenate a list of column fields into a single column name.
+
+    Parameters
+    ----------
+    field_list: list[str] of column names
+
+    Returns
+    -------
+    str: new column name
+
+    """
+    return "".join(sorted(field_list))
