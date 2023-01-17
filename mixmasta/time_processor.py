@@ -185,6 +185,21 @@ def build_date_qualifies_field(qualified_col_dict: dict, assoc_fields: list) -> 
     return None
 
 
+def add_date_to_dataframe_as_epoch(dataframe, original_date_column_name):
+    # convert value of date_type date annotations to epochtime and rename column as 'timestamp'
+    dataframe.loc[:, original_date_column_name] = dataframe[
+        original_date_column_name
+    ].apply(
+        lambda x: format_time(
+            str(x), original_date_column_name["time_format"], validate=False
+        )
+    )
+
+    staple_col_name = "timestamp"
+    dataframe.rename(columns={original_date_column_name: staple_col_name}, inplace=True)
+    return dataframe
+
+
 def day_month_year_converter(other_date_group_mapper):
     # Various date columns have been associated by the user and are not primary_date.
     # Convert to epoch time and store as a feature, do not store these separately in features.

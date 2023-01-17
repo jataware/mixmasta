@@ -18,7 +18,7 @@ from .time_processor import (
     generate_timestamp_format,
 )
 from .geo_processor import geocode, get_iso_country_dict, match_geo_names
-from .time_processor import build_date_qualifies_field
+from .time_processor import build_date_qualifies_field, add_date_to_dataframe_as_epoch
 
 
 def normalizer(
@@ -150,15 +150,18 @@ def normalizer(
             # group of year/month/day/minute/second marked as primary_time in
             # the loaded schema.
             if date_dict["date_type"] == "date":
-                # convert primary_time of date_type date to epochtime and rename as 'timestamp'
+                # df = add_date_to_dataframe_as_epoch(
+                #     dataframe=df, original_date_column_name=date_annotation_name
+                # )
                 df.loc[:, date_annotation_name] = df[date_annotation_name].apply(
                     lambda x: format_time(
                         str(x), date_dict["time_format"], validate=False
                     )
                 )
+
                 staple_col_name = "timestamp"
                 df.rename(columns={date_annotation_name: staple_col_name}, inplace=True)
-                # renamed_col_dict[ staple_col_name ] = [kk] # 7/2/2021 do not include primary cols
+
             elif date_dict["date_type"] == "epoch":
                 # rename epoch time column as 'timestamp'
                 staple_col_name = "timestamp"

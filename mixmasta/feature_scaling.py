@@ -1,21 +1,23 @@
 import numpy as np
+import pandas
 
 
-def normalize_dataframe(dataframe):
+def scale_dataframe(dataframe):
     """
     This function accepts a dataframe in the canonical format
-    and min/max normalizes each feature to between 0 to 1
+    and min/max scales each feature to between 0 to 1
     """
-    dataframe_normalized = dataframe.copy(deep=True)
+    dfs = []
     features = dataframe.feature.unique()
 
     for f in features:
-        feat = dataframe_normalized[dataframe_normalized["feature"] == f]
-        dataframe_normalized.loc[feat.index, "value"] = normalize_data(feat["value"])
-    return dataframe_normalized
+        feat = dataframe[dataframe["feature"] == f].copy()
+        feat["value"] = scale_data(feat["value"])
+        dfs.append(feat)
+    return pandas.concat(dfs)
 
 
-def normalize_data(data):
+def scale_data(data):
     """
     This function takes in an array and performs 0 to 1 normalization on it.
     It is robust to NaN values and ignores them (leaves as NaN).

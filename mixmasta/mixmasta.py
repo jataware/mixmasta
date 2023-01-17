@@ -11,6 +11,7 @@ import pandas as pd
 from . import constants
 from .file_processor import process_file_by_filetype
 from .normalizer import normalizer
+from .feature_scaling import scale_dataframe
 
 if not sys.warnoptions:
     import warnings
@@ -132,6 +133,21 @@ def process(
     norm.reset_index(inplace=True, drop=True)
 
     return norm, renamed_col_dict
+
+
+def scale_features(dataframe):
+    """scale_features takes a dataframe and scales all numerical features on a 0 to 1 scale.
+    This normalizes the data for comparison and visualization.
+
+    Args:
+        dataframe (pandas.Dataframe): A pandas dataframe with a "feature" and "value" column.
+        Will scale numerical values in the "value" column from 0 to 1.
+
+    Returns:
+        pandas.Dataframe: Returns a pandas Dataframe with numerical features scaled from 0 to 1.
+    """
+    df = scale_dataframe(dataframe)
+    return df
 
 
 class mixdata:
