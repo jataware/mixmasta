@@ -135,7 +135,7 @@ def process(
     return norm, renamed_col_dict
 
 
-def scale_features(dataframe):
+def scale_features(dataframe, output_file: str = None):
     """scale_features takes a dataframe and scales all numerical features on a 0 to 1 scale.
     This normalizes the data for comparison and visualization.
 
@@ -147,6 +147,9 @@ def scale_features(dataframe):
         pandas.Dataframe: Returns a pandas Dataframe with numerical features scaled from 0 to 1.
     """
     df = scale_dataframe(dataframe)
+
+    if output_file:
+        df.to_parquet(f"{output_file}_normalized.parquet.gzip", compression="gzip")
     return df
 
 
