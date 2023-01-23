@@ -296,7 +296,7 @@ def geocode(
     # 6) Merge df and df_geocode on x,y
     gdf = df.merge(df_geocode, how="left", on=[x, y])
 
-    return pandas.DataFrame(gdf), df_geocode
+    return pandas.DataFrame(gdf)
 
 
 def get_iso_country_dict(iso_list: list) -> dict:

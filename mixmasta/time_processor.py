@@ -81,13 +81,13 @@ def generate_timestamp_column(
     monthCol = None
     yearCol = None
 
-    for kk, vv in date_mapper.items():
-        if vv and vv["date_type"] == "day":
-            dayCol = kk
-        elif vv and vv["date_type"] == "month":
-            monthCol = kk
-        elif vv and vv["date_type"] == "year":
-            yearCol = kk
+    for date_column_name, date_ann_dict in date_mapper.items():
+        if date_ann_dict and date_ann_dict["date_type"] == "day":
+            dayCol = date_column_name
+        elif date_ann_dict and date_ann_dict["date_type"] == "month":
+            monthCol = date_column_name
+        elif date_ann_dict and date_ann_dict["date_type"] == "year":
+            yearCol = date_column_name
 
     # For missing date values, add a column to the dataframe with the default
     # value, then assign that to the day/month/year var. If the dataframe has
@@ -110,7 +110,7 @@ def generate_timestamp_column(
         df.loc[:, "year_generate_timestamp_column"] = "01"
         year = df["year_generate_timestamp_column"]
 
-    # Add the new column
+    # Add the new column COLUMN NAME IS TIMESTAMP
     df.loc[:, column_name] = month + "/" + day + "/" + year
 
     # Delete the temporary columns
@@ -148,13 +148,13 @@ def generate_timestamp_format(date_mapper: dict) -> str:
     month = "%m"
     year = "%y"
 
-    for kk, vv in date_mapper.items():
-        if vv["date_type"] == "day":
-            day = vv["time_format"]
-        elif vv["date_type"] == "month":
-            month = vv["time_format"]
-        elif vv["date_type"] == "year":
-            year = vv["time_format"]
+    for date_column_name, date_ann_dict in date_mapper.items():
+        if date_ann_dict["date_type"] == "day":
+            day = date_ann_dict["time_format"]
+        elif date_ann_dict["date_type"] == "month":
+            month = date_ann_dict["time_format"]
+        elif date_ann_dict["date_type"] == "year":
+            year = date_ann_dict["time_format"]
 
     return str.format("{}/{}/{}", month, day, year)
 
@@ -195,9 +195,37 @@ def add_date_to_dataframe_as_epoch(dataframe, original_date_column_name):
         )
     )
 
-    staple_col_name = "timestamp"
-    dataframe.rename(columns={original_date_column_name: staple_col_name}, inplace=True)
-    return dataframe
+    return rename_column_to_timestamp(
+        dataframe=dataframe, original_date_column_name=original_date_column_name
+    )
+
+
+def rename_column_to_timestamp(dataframe, original_date_column_name):
+    return dataframe.rename(
+        columns={original_date_column_name: "timestamp"}, inplace=True
+    )
+
+
+def primary_day_month_year(primary_date_list):
+    # Applied when there were primary_date year,month,day fields above.
+    # These need to be combined
+    # into a date and then epoch time, and added as the timestamp field.
+
+    # Create a separate df of the associated date fields. This avoids
+    # pandas upcasting the series dtypes on df.apply(); e.g., int to float,
+    # or a month 9 to 9.0, which breaks generate_timestamp()
+    assoc_fields = primary_date_group_mapper.keys()
+    date_df = df[assoc_fields]
+
+    # Now generate the timestamp from date_df and add timestamp col to df.
+    df = generate_timestamp_column(df, primary_date_group_mapper, "timestamp")
+
+    # Determine the correct time format for the new date column, and
+    # convert to epoch time.
+    time_formatter = generate_timestamp_format(primary_date_group_mapper)
+    df["timestamp"] = df["timestamp"].apply(
+        lambda x: format_time(str(x), time_formatter, validate=False)
+    )
 
 
 def day_month_year_converter(other_date_group_mapper):

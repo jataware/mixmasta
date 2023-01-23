@@ -18,7 +18,8 @@ from .time_processor import (
     generate_timestamp_format,
 )
 from .geo_processor import geocode, get_iso_country_dict, match_geo_names
-from .time_processor import build_date_qualifies_field, add_date_to_dataframe_as_epoch
+from .time_processor import build_date_qualifies_field
+from .time_helpers import date_type_handler, build_a_date_handler
 
 
 def normalizer(
@@ -143,6 +144,28 @@ def normalizer(
     primary_date_group_mapper = {}
     other_date_group_mapper = {}
 
+    # next((primary for primary in mapper["date"] if primary["primary_date"] == true), None)
+    mapper_date_list = mapper["date"]
+    # For every annotated date
+    for date_dict in mapper_date_list:
+        # Determine type of date and how to proceed, sometimes this spits out a full dataframe.
+        result = date_type_handler(date_dict=date_dict, dataframe=df)
+        if result is "build-a-date":
+            # Special case to handle triplet date of day, month, year column.
+            mapper_date_list.remove(date_dict)
+            build_date_components = [
+                date_dict
+                for date_dict in mapper_date_list
+                if date_dict["name"]
+                in [value for key, value in date_dict["associated_colums"]]
+            ]
+            mapper_date_list.remove(item for item in build_date_components)
+            build_date_components.append(date_dict)
+            result = build_a_date_handler(
+                date_dict=date_dict, date_mapper=build_date_components, dataframe=df
+            )
+        df = result
+
     for date_dict in mapper["date"]:
         date_annotation_name = date_dict["name"]
         if date_annotation_name in primary_time_cols:
@@ -227,7 +250,6 @@ def normalizer(
         # pandas upcasting the series dtypes on df.apply(); e.g., int to float,
         # or a month 9 to 9.0, which breaks generate_timestamp()
         assoc_fields = primary_date_group_mapper.keys()
-        date_df = df[assoc_fields]
 
         # Now generate the timestamp from date_df and add timestamp col to df.
         df = generate_timestamp_column(df, primary_date_group_mapper, "timestamp")
@@ -487,9 +509,7 @@ def normalizer(
 
     # perform geocoding if lat/lng are present
     if "lat" in df and "lng" in df:
-        df, df_geocode = geocode(
-            admin, df, x="lng", y="lat", gadm=gadm, df_geocode=df_geocode
-        )
+        df = geocode(admin, df, x="lng", y="lat", gadm=gadm, df_geocode=df_geocode)
     elif "country" in primary_geo_types or ("country" in df and not primary_geo_types):
         # Correct any misspellings etc. in state and admin areas when not
         # geocoding lat and lng above, and country is the primary_geo.
@@ -590,7 +610,7 @@ def normalizer(
 
     click.echo("Processed dataframe:")
     click.echo(df_out.head())
-    return df_out[col_order], renamed_col_dict, df_geocode
+    return df_out[col_order], renamed_col_dict
 
 
 def handle_colname_collisions(

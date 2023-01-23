@@ -91,7 +91,7 @@ def process(
     df.reset_index(inplace=True, drop=True)
 
     ## Run normalizer.
-    norm, renamed_col_dict, df_geocode = normalizer(df, mapper, admin, gadm=gadm)
+    norm, renamed_col_dict = normalizer(df, mapper, admin, gadm=gadm)
 
     # Normalizer will add NaN for missing values, e.g. when appending
     # dataframes with different columns. GADM will return None when geocoding
