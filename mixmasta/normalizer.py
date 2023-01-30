@@ -150,195 +150,204 @@ def normalizer(
     for date_dict in mapper_date_list:
         # Determine type of date and how to proceed, sometimes this spits out a full dataframe.
         result = date_type_handler(date_dict=date_dict, dataframe=df)
-        if result is "build-a-date":
+        print(f"date type results: {result}")
+        if result is None:
             # Special case to handle triplet date of day, month, year column.
             mapper_date_list.remove(date_dict)
+            print([value for value in date_dict["associated_columns"].values()])
+            print([date_assoc for date_assoc in mapper_date_list])
             build_date_components = [
-                date_dict
-                for date_dict in mapper_date_list
-                if date_dict["name"]
-                in [value for key, value in date_dict["associated_colums"]]
+                date_assoc
+                for date_assoc in mapper_date_list
+                if date_assoc["name"]
+                in [value for value in date_dict["associated_columns"].values()]
             ]
-            mapper_date_list.remove(item for item in build_date_components)
+            print(f"BUILD COMPONENTS: {build_date_components}")
+            print(
+                f"mapper date {mapper_date_list}, ITEMS: {[item for item in build_date_components]}"
+            )
+            for item in build_date_components:
+                mapper_date_list.remove(item)
             build_date_components.append(date_dict)
             result = build_a_date_handler(
                 date_dict=date_dict, date_mapper=build_date_components, dataframe=df
             )
+            print(f"date type results after build a date: {result}")
         df = result
 
-    for date_dict in mapper["date"]:
-        date_annotation_name = date_dict["name"]
-        if date_annotation_name in primary_time_cols:
-            # There should only be a single epoch or date field, or a single
-            # group of year/month/day/minute/second marked as primary_time in
-            # the loaded schema.
-            if date_dict["date_type"] == "date":
-                # df = add_date_to_dataframe_as_epoch(
-                #     dataframe=df, original_date_column_name=date_annotation_name
-                # )
-                df.loc[:, date_annotation_name] = df[date_annotation_name].apply(
-                    lambda x: format_time(
-                        str(x), date_dict["time_format"], validate=False
-                    )
-                )
+    # for date_dict in mapper["date"]:
+    #     date_annotation_name = date_dict["name"]
+    #     if date_annotation_name in primary_time_cols:
+    #         # There should only be a single epoch or date field, or a single
+    #         # group of year/month/day/minute/second marked as primary_time in
+    #         # the loaded schema.
+    #         if date_dict["date_type"] == "date":
+    #             # df = add_date_to_dataframe_as_epoch(
+    #             #     dataframe=df, original_date_column_name=date_annotation_name
+    #             # )
+    #             df.loc[:, date_annotation_name] = df[date_annotation_name].apply(
+    #                 lambda x: format_time(
+    #                     str(x), date_dict["time_format"], validate=False
+    #                 )
+    #             )
 
-                staple_col_name = "timestamp"
-                df.rename(columns={date_annotation_name: staple_col_name}, inplace=True)
+    #             staple_col_name = "timestamp"
+    #             df.rename(columns={date_annotation_name: staple_col_name}, inplace=True)
 
-            elif date_dict["date_type"] == "epoch":
-                # rename epoch time column as 'timestamp'
-                staple_col_name = "timestamp"
-                df.rename(columns={date_annotation_name: staple_col_name}, inplace=True)
-                # renamed_col_dict[ staple_col_name ] = [kk] # 7/2/2021 do not include primary cols
-            elif date_dict["date_type"] in ["day", "month", "year"]:
-                primary_date_group_mapper[date_annotation_name] = date_dict
+    #         elif date_dict["date_type"] == "epoch":
+    #             # rename epoch time column as 'timestamp'
+    #             staple_col_name = "timestamp"
+    #             df.rename(columns={date_annotation_name: staple_col_name}, inplace=True)
+    #             # renamed_col_dict[ staple_col_name ] = [kk] # 7/2/2021 do not include primary cols
+    #         elif date_dict["date_type"] in ["day", "month", "year"]:
+    #             primary_date_group_mapper[date_annotation_name] = date_dict
 
-        else:
-            if date_dict["date_type"] == "date":
-                # Convert all date/time to epoch time if not already.
-                df.loc[:, date_annotation_name] = df[date_annotation_name].apply(
-                    lambda x: format_time(
-                        str(x), date_dict["time_format"], validate=False
-                    )
-                )
-                # If three are no assigned primary_time columns, make this the
-                # primary_time timestamp column, and keep as a feature so the
-                # column_name meaning is not lost.
-                if not primary_time_cols and not "timestamp" in df.columns:
-                    df.rename(columns={date_annotation_name: "timestamp"}, inplace=True)
-                    staple_col_name = "timestamp"
-                    renamed_col_dict[staple_col_name] = [date_annotation_name]
-                # All not primary_time, not associated_columns fields are pushed to features.
-                features.append(date_annotation_name)
+    #     else:
+    #         if date_dict["date_type"] == "date":
+    #             # Convert all date/time to epoch time if not already.
+    #             df.loc[:, date_annotation_name] = df[date_annotation_name].apply(
+    #                 lambda x: format_time(
+    #                     str(x), date_dict["time_format"], validate=False
+    #                 )
+    #             )
+    #             # If three are no assigned primary_time columns, make this the
+    #             # primary_time timestamp column, and keep as a feature so the
+    #             # column_name meaning is not lost.
+    #             if not primary_time_cols and not "timestamp" in df.columns:
+    #                 df.rename(columns={date_annotation_name: "timestamp"}, inplace=True)
+    #                 staple_col_name = "timestamp"
+    #                 renamed_col_dict[staple_col_name] = [date_annotation_name]
+    #             # All not primary_time, not associated_columns fields are pushed to features.
+    #             features.append(date_annotation_name)
 
-            elif (
-                date_dict["date_type"] in constants.MONTH_DAY_YEAR
-                and "associated_columns" in date_dict
-                and date_dict["associated_columns"]
-            ):
-                # Various date columns have been associated by the user and are not primary_date.
-                # convert them to epoch then store them as a feature
-                # (instead of storing them as separate uncombined features).
-                # handle this dict after iterating all date fields
-                other_date_group_mapper[date_annotation_name] = date_dict
+    #         elif (
+    #             date_dict["date_type"] in constants.MONTH_DAY_YEAR
+    #             and "associated_columns" in date_dict
+    #             and date_dict["associated_columns"]
+    #         ):
+    #             # Various date columns have been associated by the user and are not primary_date.
+    #             # convert them to epoch then store them as a feature
+    #             # (instead of storing them as separate uncombined features).
+    #             # handle this dict after iterating all date fields
+    #             other_date_group_mapper[date_annotation_name] = date_dict
 
-            else:
-                features.append(date_annotation_name)
+    #         else:
+    #             features.append(date_annotation_name)
 
-        if "qualifies" in date_dict and date_dict["qualifies"]:
-            # Note that any "qualifier" column that is not primary geo/date
-            # will just be lopped on to the right as its own column. It's
-            # column name will just be the name and Uncharted will deal with
-            # it. The key takeaway is that qualifier columns grow the width,
-            # not the length of the dataset.
-            # Want to add the qualified col as the dictionary key.
-            # e.g. "name": "region", "qualifies": ["probability", "color"]
-            # should produce two dict entries for prob and color, with region
-            # in a list as the value for both.
-            for qualified_column in date_dict["qualifies"]:
-                if qualified_column in qualified_col_dict:
-                    qualified_col_dict[qualified_column].append(date_annotation_name)
-                else:
-                    qualified_col_dict[qualified_column] = [date_annotation_name]
+    #     if "qualifies" in date_dict and date_dict["qualifies"]:
+    #         # Note that any "qualifier" column that is not primary geo/date
+    #         # will just be lopped on to the right as its own column. It's
+    #         # column name will just be the name and Uncharted will deal with
+    #         # it. The key takeaway is that qualifier columns grow the width,
+    #         # not the length of the dataset.
+    #         # Want to add the qualified col as the dictionary key.
+    #         # e.g. "name": "region", "qualifies": ["probability", "color"]
+    #         # should produce two dict entries for prob and color, with region
+    #         # in a list as the value for both.
+    #         for qualified_column in date_dict["qualifies"]:
+    #             if qualified_column in qualified_col_dict:
+    #                 qualified_col_dict[qualified_column].append(date_annotation_name)
+    #             else:
+    #                 qualified_col_dict[qualified_column] = [date_annotation_name]
 
-    if primary_date_group_mapper:
-        # Applied when there were primary_date year,month,day fields above.
-        # These need to be combined
-        # into a date and then epoch time, and added as the timestamp field.
+    # if primary_date_group_mapper:
+    #     # Applied when there were primary_date year,month,day fields above.
+    #     # These need to be combined
+    #     # into a date and then epoch time, and added as the timestamp field.
 
-        # Create a separate df of the associated date fields. This avoids
-        # pandas upcasting the series dtypes on df.apply(); e.g., int to float,
-        # or a month 9 to 9.0, which breaks generate_timestamp()
-        assoc_fields = primary_date_group_mapper.keys()
+    #     # Create a separate df of the associated date fields. This avoids
+    #     # pandas upcasting the series dtypes on df.apply(); e.g., int to float,
+    #     # or a month 9 to 9.0, which breaks generate_timestamp()
+    #     assoc_fields = primary_date_group_mapper.keys()
 
-        # Now generate the timestamp from date_df and add timestamp col to df.
-        df = generate_timestamp_column(df, primary_date_group_mapper, "timestamp")
+    #     # Now generate the timestamp from date_df and add timestamp col to df.
+    #     df = generate_timestamp_column(df, primary_date_group_mapper, "timestamp")
 
-        # Determine the correct time format for the new date column, and
-        # convert to epoch time.
-        time_formatter = generate_timestamp_format(primary_date_group_mapper)
-        df["timestamp"] = df["timestamp"].apply(
-            lambda x: format_time(str(x), time_formatter, validate=False)
-        )
+    #     # Determine the correct time format for the new date column, and
+    #     # convert to epoch time.
+    #     time_formatter = generate_timestamp_format(primary_date_group_mapper)
+    #     df["timestamp"] = df["timestamp"].apply(
+    #         lambda x: format_time(str(x), time_formatter, validate=False)
+    #     )
 
-        # Let SpaceTag know those date columns were renamed to timestamp.
-        # renamed_col_dict[ "timestamp" ] = assoc_fields # 7/2/2021 do not include primary cols
+    #     # Let SpaceTag know those date columns were renamed to timestamp.
+    #     # renamed_col_dict[ "timestamp" ] = assoc_fields # 7/2/2021 do not include primary cols
 
-    while other_date_group_mapper:
-        # Various date columns have been associated by the user and are not primary_date.
-        # Convert to epoch time and store as a feature, do not store these separately in features.
-        # Exception is the group is only two of day, month, year: leave as date.
-        # Control for possibility of more than one set of assciated_columns.
+    # while other_date_group_mapper:
+    #     # Various date columns have been associated by the user and are not primary_date.
+    #     # Convert to epoch time and store as a feature, do not store these separately in features.
+    #     # Exception is the group is only two of day, month, year: leave as date.
+    #     # Control for possibility of more than one set of assciated_columns.
 
-        # Pop the first item in the mapper and begin building that date set.
-        date_field_tuple = other_date_group_mapper.popitem()
-        print(f"DEBUG: {date_field_tuple}")
+    #     # Pop the first item in the mapper and begin building that date set.
+    #     date_field_tuple = other_date_group_mapper.popitem()
+    #     print(f"DEBUG: {date_field_tuple}")
 
-        # Build a list of column names associated with the the popped date field.
-        assoc_fields = [k[1] for k in date_field_tuple[1]["associated_columns"].items()]
+    #     # Build a list of column names associated with the the popped date field.
+    #     assoc_fields = [k[1] for k in date_field_tuple[1]["associated_columns"].items()]
 
-        # Pop those mapper objects into a dict based on the column name keys in
-        # assocfields list.
-        assoc_columns_dict = {
-            f: other_date_group_mapper.pop(f)
-            for f in assoc_fields
-            if f in other_date_group_mapper
-        }
+    #     # Pop those mapper objects into a dict based on the column name keys in
+    #     # assocfields list.
+    #     assoc_columns_dict = {
+    #         f: other_date_group_mapper.pop(f)
+    #         for f in assoc_fields
+    #         if f in other_date_group_mapper
+    #     }
 
-        # Add the first popped tuple into the assoc_columns dict where the key is the
-        # first part of the tuple; the value is the 2nd part.
-        assoc_columns_dict[date_field_tuple[0]] = date_field_tuple[1]
+    #     # Add the first popped tuple into the assoc_columns dict where the key is the
+    #     # first part of the tuple; the value is the 2nd part.
+    #     assoc_columns_dict[date_field_tuple[0]] = date_field_tuple[1]
 
-        # Add the first popped tuple column name to the list of associated fields.
-        assoc_fields.append(date_field_tuple[0])
+    #     # Add the first popped tuple column name to the list of associated fields.
+    #     assoc_fields.append(date_field_tuple[0])
 
-        # TODO: If day and year are associated to each other and month, but
-        # month is not associated to those fields, then at this point assoc_fields
-        # will be the three values, and assoc_columns will contain only day and
-        # year. This will error out below. It is assumed that SpaceTag will
-        # control for this instance.
+    #     # TODO: If day and year are associated to each other and month, but
+    #     # month is not associated to those fields, then at this point assoc_fields
+    #     # will be the three values, and assoc_columns will contain only day and
+    #     # year. This will error out below. It is assumed that SpaceTag will
+    #     # control for this instance.
 
-        # If there is no primary_time column for timestamp, which would have
-        # been created above with primary_date_group_mapper, or farther above
-        # looping mapper["date"], attempt to generate from date_type = Month,
-        # Day, Year features. Otherwise, create a new column name from the
-        # concatenation of the associated date fields here.
-        if not "timestamp" in df.columns:
-            new_column_name = "timestamp"
-        else:
-            new_column_name = generate_column_name(assoc_fields)
+    #     # If there is no primary_time column for timestamp, which would have
+    #     # been created above with primary_date_group_mapper, or farther above
+    #     # looping mapper["date"], attempt to generate from date_type = Month,
+    #     # Day, Year features. Otherwise, create a new column name from the
+    #     # concatenation of the associated date fields here.
+    #     if not "timestamp" in df.columns:
+    #         new_column_name = "timestamp"
+    #     else:
+    #         new_column_name = generate_column_name(assoc_fields)
 
-        # Create a separate df of the associated date fields. This avoids
-        # pandas upcasting the series dtypes on df.apply(); e.g., int to float,
-        # or a month 9 to 9.0, which breaks generate_timestamp()
-        date_df = df[assoc_fields]
+    #     # Create a separate df of the associated date fields. This avoids
+    #     # pandas upcasting the series dtypes on df.apply(); e.g., int to float,
+    #     # or a month 9 to 9.0, which breaks generate_timestamp()
+    #     date_df = df[assoc_fields]
 
-        # Now generate the timestamp from date_df and add timestamp col to df.
-        df = generate_timestamp_column(df, assoc_columns_dict, new_column_name)
+    #     # Now generate the timestamp from date_df and add timestamp col to df.
+    #     df = generate_timestamp_column(df, assoc_columns_dict, new_column_name)
 
-        # Determine the correct time format for the new date column, and
-        # convert to epoch time only if all three date components (day, month,
-        # year) are present; otherwise leave as a date string.
-        date_types = [v["date_type"] for k, v in assoc_columns_dict.items()]
-        if len(frozenset(date_types).intersection(constants.MONTH_DAY_YEAR)) == 3:
-            time_formatter = generate_timestamp_format(assoc_columns_dict)
-            df.loc[:, new_column_name] = df[new_column_name].apply(
-                lambda x: format_time(str(x), time_formatter, validate=False)
-            )
+    #     # Determine the correct time format for the new date column, and
+    #     # convert to epoch time only if all three date components (day, month,
+    #     # year) are present; otherwise leave as a date string.
+    #     date_types = [v["date_type"] for k, v in assoc_columns_dict.items()]
+    #     if len(frozenset(date_types).intersection(constants.MONTH_DAY_YEAR)) == 3:
+    #         time_formatter = generate_timestamp_format(assoc_columns_dict)
+    #         df.loc[:, new_column_name] = df[new_column_name].apply(
+    #             lambda x: format_time(str(x), time_formatter, validate=False)
+    #         )
 
-        # Let SpaceTag know those date columns were renamed to a new column.
-        renamed_col_dict[new_column_name] = assoc_fields
+    #     # Let SpaceTag know those date columns were renamed to a new column.
+    #     renamed_col_dict[new_column_name] = assoc_fields
 
-        # timestamp is a protected column, so don't add to features.
-        if new_column_name != "timestamp":
-            # Handle edge case of each date field in assoc_fields qualifying
-            # the same column e.g. day/month/year are associated and qualify
-            # a field. In this case, the new_column_name
-            qualified_col = build_date_qualifies_field(qualified_col_dict, assoc_fields)
-            if qualified_col is None:
-                features.append(new_column_name)
-            else:
-                qualified_col_dict[qualified_col] = [new_column_name]
+    #     # timestamp is a protected column, so don't add to features.
+    #     if new_column_name != "timestamp":
+    #         # Handle edge case of each date field in assoc_fields qualifying
+    #         # the same column e.g. day/month/year are associated and qualify
+    #         # a field. In this case, the new_column_name
+    #         qualified_col = build_date_qualifies_field(qualified_col_dict, assoc_fields)
+    #         if qualified_col is None:
+    #             features.append(new_column_name)
+    #         else:
+    #             qualified_col_dict[qualified_col] = [new_column_name]
 
     for geo_dict in mapper["geo"]:
         kk = geo_dict["name"]

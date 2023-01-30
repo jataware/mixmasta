@@ -1,5 +1,5 @@
 bump2version==1.0.1
-Click>=7.0,<8
+Click==8.0
 coverage==4.5.4
 Cython==0.29.23
 flake8==3.7.8

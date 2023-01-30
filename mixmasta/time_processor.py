@@ -185,15 +185,11 @@ def build_date_qualifies_field(qualified_col_dict: dict, assoc_fields: list) -> 
     return None
 
 
-def add_date_to_dataframe_as_epoch(dataframe, original_date_column_name):
+def add_date_to_dataframe_as_epoch(dataframe, date_dict, original_date_column_name):
     # convert value of date_type date annotations to epochtime and rename column as 'timestamp'
     dataframe.loc[:, original_date_column_name] = dataframe[
         original_date_column_name
-    ].apply(
-        lambda x: format_time(
-            str(x), original_date_column_name["time_format"], validate=False
-        )
-    )
+    ].apply(lambda x: format_time(str(x), date_dict["time_format"], validate=False))
 
     return rename_column_to_timestamp(
         dataframe=dataframe, original_date_column_name=original_date_column_name
@@ -201,9 +197,8 @@ def add_date_to_dataframe_as_epoch(dataframe, original_date_column_name):
 
 
 def rename_column_to_timestamp(dataframe, original_date_column_name):
-    return dataframe.rename(
-        columns={original_date_column_name: "timestamp"}, inplace=True
-    )
+    dataframe.rename(columns={original_date_column_name: "timestamp"}, inplace=True)
+    return dataframe
 
 
 def primary_day_month_year(primary_date_list):

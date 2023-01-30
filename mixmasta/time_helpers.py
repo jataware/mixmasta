@@ -19,17 +19,26 @@ def date_type_handler(dataframe, date_dict):
         epoch time, returns a str flag if the date was day month year
     """
     date_type = date_dict["date_type"]
+    print(f"DATE TYPE: {date_type}")
     primary_date = date_dict.get("primary_date")
     date_column_name = date_dict["name"]
-    match [date_type, primary_date]:
-        case ["date", True]:
-            return add_date_to_dataframe_as_epoch(dataframe, date_column_name)
-        case ["epoch", True]:
-            return rename_column_to_timestamp(
-                dataframe=dataframe, original_date_column_name=date_column_name
-            )
-        case ["day" | "month" | "year", True]:
-            return "build-a-date"
+    if date_type == "date":
+        return add_date_to_dataframe_as_epoch(dataframe, date_dict, date_column_name)
+    if date_type == "epoch":
+        return rename_column_to_timestamp(
+            dataframe=dataframe, original_date_column_name=date_column_name
+        )
+    if date_type == "day" or date_type == "month" or date_type == "year":
+        return None
+    # match [date_type, primary_date]:
+    #     case ["date", True]:
+    #         return add_date_to_dataframe_as_epoch(dataframe, date_column_name)
+    #     case ["epoch", True]:
+    #         return rename_column_to_timestamp(
+    #             dataframe=dataframe, original_date_column_name=date_column_name
+    #         )
+    #     case ["day" | "month" | "year", True]:
+    #         return "build-a-date"
 
 
 def build_a_date_handler(date_mapper, dataframe):
