@@ -12,6 +12,7 @@ from . import constants
 from .file_processor import process_file_by_filetype
 from .normalizer import normalizer
 from .feature_scaling import scale_dataframe
+from .transformations.clipping import construct_multipolygon, clip_dataframe
 
 if not sys.warnoptions:
     import warnings
@@ -151,6 +152,23 @@ def scale_features(dataframe, output_file: str = None):
     if output_file:
         df.to_parquet(f"{output_file}_normalized.parquet.gzip", compression="gzip")
     return df
+
+
+def clip_data(dataframe, geo_columns, polygons_list):
+    """Clips data based on geographical shape(s) or shapefile (NOT IMPLEMENTED).
+
+    Args:
+        dataframe (pandas.Dataframe): A pandas dataframe containing geographical data.
+        geo_columns (list): A list containing the two column names for the lat/lon columns in the dataframe.
+        polygons_list (list[list[obj]]): A list containing lists of objects that represent polygon shapes to clip to.
+
+    Returns:
+        pandas.Dataframe: A pandas dataframe only containing the clipped data.
+    """
+
+    mask = construct_multipolygon(polygons_list=polygons_list)
+
+    return clip_dataframe(dataframe=dataframe, geo_columns=geo_columns, mask=mask)
 
 
 class mixdata:

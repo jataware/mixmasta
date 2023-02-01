@@ -170,7 +170,7 @@ def normalizer(
                 mapper_date_list.remove(item)
             build_date_components.append(date_dict)
             result = build_a_date_handler(
-                date_dict=date_dict, date_mapper=build_date_components, dataframe=df
+                date_mapper=build_date_components, dataframe=df
             )
             print(f"date type results after build a date: {result}")
         df = result

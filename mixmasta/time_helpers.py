@@ -19,7 +19,7 @@ def date_type_handler(dataframe, date_dict):
         epoch time, returns a str flag if the date was day month year
     """
     date_type = date_dict["date_type"]
-    print(f"DATE TYPE: {date_type}")
+    # print(f"DATE TYPE: {date_type}")
     primary_date = date_dict.get("primary_date")
     date_column_name = date_dict["name"]
     if date_type == "date":
@@ -44,6 +44,7 @@ def date_type_handler(dataframe, date_dict):
 def build_a_date_handler(date_mapper, dataframe):
 
     # Now generate the timestamp from date_df and add timestamp col to df.
+    print(f"BUILD A DATE MAPPER {date_mapper}")
     result = generate_timestamp_column(dataframe, date_mapper, "timestamp")
 
     # Determine the correct time format for the new date column, and
