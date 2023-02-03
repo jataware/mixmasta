@@ -1,6 +1,6 @@
 import geopandas
 import pandas
-from shapely import MultiPolygon, Polygon
+from shapely.geometry import MultiPolygon, Polygon
 
 
 def construct_multipolygon(polygons_list):
