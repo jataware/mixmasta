@@ -45,7 +45,9 @@ def build_a_date_handler(date_mapper, dataframe):
 
     # Now generate the timestamp from date_df and add timestamp col to df.
     print(f"BUILD A DATE MAPPER {date_mapper}")
-    result = generate_timestamp_column(dataframe, date_mapper, "timestamp")
+    result = generate_timestamp_column(
+        df=dataframe, date_mapper=date_mapper, column_name="timestamp"
+    )
 
     # Determine the correct time format for the new date column, and
     # convert to epoch time.

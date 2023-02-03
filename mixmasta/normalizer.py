@@ -154,21 +154,16 @@ def normalizer(
         if result is None:
             # Special case to handle triplet date of day, month, year column.
             mapper_date_list.remove(date_dict)
-            print([value for value in date_dict["associated_columns"].values()])
-            print([date_assoc for date_assoc in mapper_date_list])
-            build_date_components = [
-                date_assoc
+            build_date_components = {
+                date_assoc["name"]: date_assoc
                 for date_assoc in mapper_date_list
                 if date_assoc["name"]
                 in [value for value in date_dict["associated_columns"].values()]
-            ]
+            }
             print(f"BUILD COMPONENTS: {build_date_components}")
-            print(
-                f"mapper date {mapper_date_list}, ITEMS: {[item for item in build_date_components]}"
-            )
-            for item in build_date_components:
+            for item in build_date_components.values():
                 mapper_date_list.remove(item)
-            build_date_components.append(date_dict)
+            build_date_components[date_dict["name"]] = date_dict
             result = build_a_date_handler(
                 date_mapper=build_date_components, dataframe=df
             )
