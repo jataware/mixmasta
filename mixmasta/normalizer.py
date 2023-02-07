@@ -600,7 +600,9 @@ def normalizer(
                 if feat in other_time_cols:
                     df_out = df_out.append(df_.astype({"value": object}))
                 else:
-                    df_out = df_out.append(df_)
+                    print(f"DF OUT: {df_out}")
+                    print(f"DF PRIME: {df_}")
+                    df_out = df_out.append(df_.reset_index(drop=True))
 
     for c in col_order:
         if c not in df_out:

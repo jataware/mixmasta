@@ -12,7 +12,8 @@ from . import constants
 from .file_processor import process_file_by_filetype
 from .normalizer import normalizer
 from .feature_scaling import scale_dataframe
-from .transformations.clipping import construct_multipolygon, clip_dataframe
+from .transformations.clipping import construct_multipolygon, clip_dataframe, clip_time
+from .transformations.scaling import scale_time
 
 if not sys.warnoptions:
     import warnings
@@ -169,6 +170,45 @@ def clip_data(dataframe, geo_columns, polygons_list):
     mask = construct_multipolygon(polygons_list=polygons_list)
 
     return clip_dataframe(dataframe=dataframe, geo_columns=geo_columns, mask=mask)
+
+
+def clip_dataframe_time(dataframe, time_column, time_ranges):
+    """Clips data in a dataframe based on a list of time ranges.
+
+    Args:
+        dataframe (pandas.Dataframe): Dataframe with some time column that is the target for the clip
+        time_column (string): Name of target time column
+        time_ranges (List[Dict]): List of dictionaries containing "start" and "end" datetime values
+
+    Returns:
+        _type_: _description_
+    """
+
+    return clip_time(
+        dataframe=dataframe, time_column=time_column, time_ranges=time_ranges
+    )
+
+
+def rescale_dataframe_time(
+    dataframe, time_column, time_bucket, aggregation_function_list
+):
+    """Rescales a dataframes time periodicity using aggregation functions.
+
+    Args:
+        dataframe (pandas.Dataframe): A dataframe containing a column of time values to be rescaled
+        time_column (string): Name of target time column
+        time_bucket (DateOffset, Timedelta or str): Some time bucketing rule to lump the time in to. ex. 'M', 'A', '2H'
+        aggregation_function_list (List[strings]): List of aggregation functions to apply to the data. ex. ['sum'] or ['sum', 'min', 'max']
+
+    Returns:
+        _type_: _description_
+    """
+    return scale_time(
+        dataframe=dataframe,
+        time_column=time_column,
+        time_bucket=time_bucket,
+        aggregation_function_list=aggregation_function_list,
+    )
 
 
 class mixdata:

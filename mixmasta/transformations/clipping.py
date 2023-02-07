@@ -30,3 +30,26 @@ def clip_dataframe(dataframe, geo_columns, mask):
     )
 
     return pandas.DataFrame(geopandas.clip(geo_dataframe, mask))
+
+
+def clip_time(dataframe, time_column, time_ranges):
+    """Removes rows in a dataset that lie outside of a specified time range.
+
+    Args:
+        dataframe (pandas.Dataframe): Dataframe to drop rows from
+        time_column (string): name of the column in the dataframe that represents the time to check.
+        time_ranges (List[Object[start: datetime, end: datetime]]): A list of objects containing a start and end datetime to make a range.
+    """
+    dataframe[time_column] = pandas.to_datetime(dataframe[time_column])
+
+    print(dataframe.dtypes)
+
+    final_dataframe = pandas.DataFrame()
+    for start_end_datetime in time_ranges:
+        mask = (dataframe[time_column] > start_end_datetime["start"]) & (
+            dataframe[time_column] <= start_end_datetime["end"]
+        )
+        intermediate_frame = dataframe.loc[mask]
+        final_dataframe = final_dataframe.append(intermediate_frame)
+
+    return final_dataframe
