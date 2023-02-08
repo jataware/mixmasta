@@ -14,6 +14,7 @@ from .normalizer import normalizer
 from .feature_scaling import scale_dataframe
 from .transformations.clipping import construct_multipolygon, clip_dataframe, clip_time
 from .transformations.scaling import scale_time
+from .transformations.geo_utils import calculate_boundary_box
 
 if not sys.warnoptions:
     import warnings
@@ -209,6 +210,20 @@ def rescale_dataframe_time(
         time_bucket=time_bucket,
         aggregation_function_list=aggregation_function_list,
     )
+
+
+def get_boundary_box(dataframe, geo_columns):
+    """Returns the minimum and maximum x,y coordinates for a geographical dataset with latitude and longitude.
+
+    Args:
+        dataframe (pandas.Dataframe): Pandas dataframe with latitude and longitude
+        geo_columns (List[string]): A list of the two column names that represent latitude and longitude.
+
+    Returns:
+        Dict: An object containing key value pairs for xmin, xmax,  ymin, and ymax.
+    """
+
+    return calculate_boundary_box(dataframe=dataframe, geo_columns=geo_columns)
 
 
 class mixdata:

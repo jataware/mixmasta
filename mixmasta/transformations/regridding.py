@@ -1,7 +1,7 @@
 import geopandas
 import numpy
 import pandas
-from shapely.geometry import MultiPolygon, Polygon, box
+from shapely.geometry import box
 
 
 def regrid_dataframe(dataframe, geo_columns):
