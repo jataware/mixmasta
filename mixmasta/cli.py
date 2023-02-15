@@ -1,14 +1,12 @@
 import os
-import sys
-from datetime import datetime
 
 import click
 import pandas as pd
 
 from .download import download_and_clean
-from .mixmasta import geocode, netcdf2df, process, raster2df, normalizer, optimize_df_types, mixdata
-#from download import download_and_clean
-#from mixmasta import geocode, netcdf2df, process, raster2df, normalizer, optimize_df_types, mixdata
+from .mixmasta import normalizer, optimize_df_types, mixdata
+from .file_processor import netcdf2df, raster2df
+from .geo_processor import geocode
 
 from glob import glob
 import numpy as np
@@ -19,37 +17,45 @@ import timeit
 
 # Constants
 CHUNK_SIZE = 100000
-DATA_TEMP_FILENAME = 'causmosify_multi_tmp'
-PROCESSED_TEMP_FILENAME = 'processed_tmp'
+DATA_TEMP_FILENAME = "causmosify_multi_tmp"
+PROCESSED_TEMP_FILENAME = "processed_tmp"
+
 
 @click.group()
 def cli():
     pass
 
 
-def chunk_normalize(input_file: str, mapper: dict, renamed_col_dict: dict, geo: str, gadm, df_geocode: pd.DataFrame) -> dict:
+def chunk_normalize(
+    input_file: str,
+    mapper: dict,
+    renamed_col_dict: dict,
+    geo: str,
+    gadm,
+    df_geocode: pd.DataFrame,
+) -> dict:
     """
-        Description
-        ----------
-            Normalize input_file in chunks written to pkl files.
+    Description
+    ----------
+        Normalize input_file in chunks written to pkl files.
 
-        Parameters
-        ----------
-            input_file: str
-                Filename of file to normalize.
-            mapper: dict
-                Mapper dict for filename.
-            renamed_col_dict: dict
-                Dict maintained to track columns renamed during normalize()
-            gadm: 
-                GADM geopandas object passed as param so it is loaded only once
-            df_geocode: pd.DataFrame
-                lat/lng geocode library to cache geocoding.
-        
-        Returns
-        -------
-            dict: 
-                updated renamed_col_dict
+    Parameters
+    ----------
+        input_file: str
+            Filename of file to normalize.
+        mapper: dict
+            Mapper dict for filename.
+        renamed_col_dict: dict
+            Dict maintained to track columns renamed during normalize()
+        gadm:
+            GADM geopandas object passed as param so it is loaded only once
+        df_geocode: pd.DataFrame
+            lat/lng geocode library to cache geocoding.
+
+    Returns
+    -------
+        dict:
+            updated renamed_col_dict
 
     """
 
@@ -57,12 +63,12 @@ def chunk_normalize(input_file: str, mapper: dict, renamed_col_dict: dict, geo: 
     df_columns = []
     first_norm_time = 0
 
-    click.echo(f'\nLoading {input_file} ...')
+    click.echo(f"\nLoading {input_file} ...")
     start_time = timeit.default_timer()
-    
+
     # Set the transformation type, and reduce the mapper to date, geo and feature keys.
     transform = mapper["meta"]
-    mapper = { k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"} }
+    mapper = {k: mapper[k] for k in mapper.keys() & {"date", "geo", "feature"}}
 
     # File type-specific pre-processing
     ftype = transform["ftype"]
@@ -73,77 +79,89 @@ def chunk_normalize(input_file: str, mapper: dict, renamed_col_dict: dict, geo: 
             d = transform["date"]
 
         df = raster2df(
-            InRaster = input_file,
-            feature_name = transform["feature_name"],
-            band = int(transform["band"] if "band" in transform and transform["band"] != "" else "0"),
-            nodataval = int(transform["null_val"]),
-            date = d,
-            band_name = transform["band_name"],
-            bands = transform["bands"] if "bands" in transform else None
+            InRaster=input_file,
+            feature_name=transform["feature_name"],
+            band=int(
+                transform["band"]
+                if "band" in transform and transform["band"] != ""
+                else "0"
+            ),
+            nodataval=int(transform["null_val"]),
+            date=d,
+            band_name=transform["band_name"],
+            bands=transform["bands"] if "bands" in transform else None,
         )
-    elif ftype == 'excel':
-        df = pd.read_excel(input_file, transform['sheet'])
+    elif ftype == "excel":
+        df = pd.read_excel(input_file, transform["sheet"])
     elif ftype != "csv":
         df = netcdf2df(input_file)
     else:
         df = pd.read_csv(input_file)
 
     df.reset_index(inplace=True, drop=True)
-    
+
     # Set the number of chunks based on CHUNK_SIZE
-    chunks = 1 + (df.shape[0] // CHUNK_SIZE) 
-    
+    chunks = 1 + (df.shape[0] // CHUNK_SIZE)
+
     # Entire dataset is loaded into df. Write in chunks to pkl files.
-    for i in range(1, chunks+1): 
-        filename = f'{DATA_TEMP_FILENAME}.{i}.pkl'
-        stop_row = i*CHUNK_SIZE
+    for i in range(1, chunks + 1):
+        filename = f"{DATA_TEMP_FILENAME}.{i}.pkl"
+        stop_row = i * CHUNK_SIZE
         start_row = stop_row - CHUNK_SIZE
-        df.iloc[start_row:stop_row,:].to_pickle(filename)
-        
-    click.echo(f'Processing {input_file} ...')
+        df.iloc[start_row:stop_row, :].to_pickle(filename)
+
+    click.echo(f"Processing {input_file} ...")
     start_time = timeit.default_timer()
-    
+
     # Iterate chunk tmp files and normalize each loaded df.
-    for i in range(1, chunks+1): 
-        read_filename = f'{DATA_TEMP_FILENAME}.{i}.pkl' 
+    for i in range(1, chunks + 1):
+        read_filename = f"{DATA_TEMP_FILENAME}.{i}.pkl"
         df_temp = pd.read_pickle(read_filename)
 
         ## Run normalizer.
         norm_start_time = timeit.default_timer()
-        norm, result_dict, df_geocode  = normalizer(df_temp, mapper, geo, gadm=gadm, df_geocode=df_geocode)
-   
+        norm, result_dict, df_geocode = normalizer(
+            df_temp, mapper, geo, gadm=gadm, df_geocode=df_geocode
+        )
+
         # Normalizer will add NaN for missing values, e.g. when appending
         # dataframes with different columns. GADM will return None when geocoding
         # but not finding the entity (e.g. admin3 for United States).
         # Replace None with NaN for consistency.
         norm.fillna(value=np.nan, inplace=True)
 
-        # In edge cases where the input files have different columns, keep 
+        # In edge cases where the input files have different columns, keep
         # list of all columns for reading the tmp file.
         for col in norm.columns.values.tolist():
             if col not in df_columns:
                 df_columns.append(col)
-        
+
         if len(df_datatypes) == 0:
             # Record datatypes of normalized df for setting on read.
             norm = optimize_df_types(norm)
             df_datatypes = dict(norm.dtypes)
 
-        #norm.to_csv(chunked_temp_filename, mode='a', index=False, header=False)
-        write_filename = f'{PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}.{i}.pkl'
+        # norm.to_csv(chunked_temp_filename, mode='a', index=False, header=False)
+        write_filename = (
+            f"{PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}.{i}.pkl"
+        )
         norm.to_pickle(write_filename)
 
         # A little cleanup, probably ineffective.
-        del(norm)
-        del(df_temp)
+        del norm
+        del df_temp
 
         # Delete tmp files as they are read.
         os.remove(read_filename)
 
         # Combine dict to return single file.
-        renamed_col_dict = result_dict if not renamed_col_dict else {**renamed_col_dict, **result_dict}
+        renamed_col_dict = (
+            result_dict if not renamed_col_dict else {**renamed_col_dict, **result_dict}
+        )
 
-    click.echo(f'{input_file} processing completed in {timeit.default_timer() - start_time} seconds')
+    click.echo(
+        f"{input_file} processing completed in {timeit.default_timer() - start_time} seconds"
+    )
 
     return renamed_col_dict
 
@@ -151,20 +169,20 @@ def chunk_normalize(input_file: str, mapper: dict, renamed_col_dict: dict, geo: 
 def get_gadm(geo: str):
     # Cache GADM for normalize() loops.
     md = mixdata()
-    if geo.lower() in ['admin0', 'country']:
-        click.echo('Loading GADM0 ...')
+    if geo.lower() in ["admin0", "country"]:
+        click.echo("Loading GADM0 ...")
         md.load_gadm2()
         gadm = md.gadm0
-    elif geo.lower() == 'admin1':
-        click.echo('Loading GADM1 ...')
+    elif geo.lower() == "admin1":
+        click.echo("Loading GADM1 ...")
         md.load_gadm2()
         gadm = md.gadm1
-    elif geo.lower() == 'admin2':
-        click.echo('Loading GADM2 ...')
+    elif geo.lower() == "admin2":
+        click.echo("Loading GADM2 ...")
         md.load_gadm2()
         gadm = md.gadm2
     else:
-        click.echo('Loading GADM3 ...')
+        click.echo("Loading GADM3 ...")
         md.load_gadm3()
         gadm = md.gadm3
 
@@ -186,17 +204,20 @@ def glob_input_file(input_file: str) -> str:
             input_file = input_file
     return input_file
 
+
 @cli.command()
 @click.option("--input_file", type=str, default=None)
 @click.option("--mapper", type=str, default=None)
 @click.option("--geo", type=str, default=None)
 @click.option("--output_file", type=str, default="mixmasta_output")
-def causemosify(input_file, mapper, geo: str = None, output_file: str = "mixmasta_output"):
+def causemosify(
+    input_file, mapper, geo: str = None, output_file: str = "mixmasta_output"
+):
     """Processor for generating CauseMos compliant datasets."""
     click.echo("Causemosifying data...")
 
-    input_file =  glob_input_file(input_file)
-    
+    input_file = glob_input_file(input_file)
+
     with open(mapper) as f:
         mapper = json.loads(f.read())
 
@@ -206,7 +227,9 @@ def causemosify(input_file, mapper, geo: str = None, output_file: str = "mixmast
         if "geocode_level" in transform:
             geo = transform["geocode_level"]
         else:
-            click.echo("No geo specified and no meta.geocode_level in mapper.json. Defaulting to admin2.")
+            click.echo(
+                "No geo specified and no meta.geocode_level in mapper.json. Defaulting to admin2."
+            )
             geo = "admin2"
 
     gadm = get_gadm(geo)
@@ -217,31 +240,33 @@ def causemosify(input_file, mapper, geo: str = None, output_file: str = "mixmast
     renamed_col_dict = chunk_normalize(input_file, mapper, {}, geo, gadm, df_geocode)
 
     # Reassemble tmp pkl files.
-    df_final = pd.concat([pd.read_pickle(fl) for fl in glob(f'{PROCESSED_TEMP_FILENAME}.*.pkl')])
+    df_final = pd.concat(
+        [pd.read_pickle(fl) for fl in glob(f"{PROCESSED_TEMP_FILENAME}.*.pkl")]
+    )
     df_final.reset_index(inplace=True, drop=True)
-    
-    # Clean up reassembly. 
-    for fl in glob(f'{PROCESSED_TEMP_FILENAME}*'):
+
+    # Clean up reassembly.
+    for fl in glob(f"{PROCESSED_TEMP_FILENAME}*"):
         os.remove(fl)
-    
+
     # Write separate parquet files.
-    df_final['type'] = df_final[['value']].applymap(type)
-    df_final_str = df_final[df_final['type']==str]
-    df_final = df_final[df_final['type']!=str]
-    del(df_final_str['type'])
-    del(df_final['type'])
+    df_final["type"] = df_final[["value"]].applymap(type)
+    df_final_str = df_final[df_final["type"] == str]
+    df_final = df_final[df_final["type"] != str]
+    del df_final_str["type"]
+    del df_final["type"]
 
     df_final.to_parquet(f"{output_file}.parquet.gzip", compression="gzip")
     if not df_final_str.empty:
         df_final_str.to_parquet(f"{output_file}_str.parquet.gzip", compression="gzip")
-    
+
     # Rebuild and reduce memory size of returned dataframe.
     df_final = df_final.append(df_final_str)
     df_final = optimize_df_types(df_final)
     df_final.reset_index(inplace=True, drop=True)
 
     return df_final, renamed_col_dict
-    
+
 
 @cli.command()
 @click.option("--inputs", type=str, default=None)
@@ -263,36 +288,36 @@ def causemosify_multi(inputs, geo: str = None, output_file: str = "mixmasta_outp
         Writes separate parquet files for each input file.
     """
 
-    input_array = json.loads(inputs)   
+    input_array = json.loads(inputs)
     click.echo(f"Causemosifying {len(input_array)} file(s) ...")
-    
+
     # Setup variables.
     renamed_col_dict = {}
     df_geocode = pd.DataFrame()
 
     # Delete any previous tmp files.
-    for fl in glob(f'{PROCESSED_TEMP_FILENAME}*'):
+    for fl in glob(f"{PROCESSED_TEMP_FILENAME}*"):
         os.remove(fl)
-    
-    for fl in glob(f'{DATA_TEMP_FILENAME}*'):
+
+    for fl in glob(f"{DATA_TEMP_FILENAME}*"):
         os.remove(fl)
-  
+
     # Iterate each item_item in the --inputs JSON.
     item_counter = 0
 
     # Geo control varibles to avoid reloading GADM.
-    item_geo = None # geo for item to be processed
-    last_geo = None # geo of last item processed
+    item_geo = None  # geo for item to be processed
+    last_geo = None  # geo of last item processed
     gadm = pd.DataFrame()
 
     # All output files should have the same columns.
-    output_columns = [] 
+    output_columns = []
 
-    for item_item in input_array:        
+    for item_item in input_array:
         # Handle filename wildcards with glob_input_file().
-        input_file =  glob_input_file(item_item["input_file"])
-       
-        with open(item_item ["mapper"]) as f:
+        input_file = glob_input_file(item_item["input_file"])
+
+        with open(item_item["mapper"]) as f:
             mapper = json.loads(f.read())
 
         # Check transform for meta.geocode_level. This is overriden by geo parameter.
@@ -301,15 +326,17 @@ def causemosify_multi(inputs, geo: str = None, output_file: str = "mixmasta_outp
             if "geocode_level" in transform:
                 loop_geo = transform["geocode_level"]
 
-                if (loop_geo != last_geo or gadm.empty):
+                if loop_geo != last_geo or gadm.empty:
                     gadm = get_gadm(loop_geo)
 
                 last_geo = loop_geo
             else:
-                click.echo("No geo specified and no meta.geocode_level in mapper.json. Defaulting to admin2.")
+                click.echo(
+                    "No geo specified and no meta.geocode_level in mapper.json. Defaulting to admin2."
+                )
                 loop_geo = "admin2"
 
-                if (loop_geo != last_geo or gadm.empty):
+                if loop_geo != last_geo or gadm.empty:
                     gadm = get_gadm(loop_geo)
 
                 last_geo = loop_geo
@@ -318,66 +345,83 @@ def causemosify_multi(inputs, geo: str = None, output_file: str = "mixmasta_outp
             if gadm.empty:
                 gadm = get_gadm(geo)
 
-        renamed_col_dict = chunk_normalize(input_file = input_file, 
-            mapper = mapper, 
-            renamed_col_dict=renamed_col_dict, 
+        renamed_col_dict = chunk_normalize(
+            input_file=input_file,
+            mapper=mapper,
+            renamed_col_dict=renamed_col_dict,
             geo=geo,
             gadm=gadm,
-            df_geocode=df_geocode)
+            df_geocode=df_geocode,
+        )
 
-        df_col = pd.read_pickle(f'{PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}.1.pkl')
+        df_col = pd.read_pickle(
+            f"{PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}.1.pkl"
+        )
 
         # Maintain master list of output columns while respecting column order.
         if len(output_columns) == 0:
             output_columns = df_col.columns.values.tolist()
         else:
             # Only add the columns in the df_col not in output_columns.
-            output_columns = output_columns + list(set(df_col.columns.values.tolist()).difference(set(output_columns)))
+            output_columns = output_columns + list(
+                set(df_col.columns.values.tolist()).difference(set(output_columns))
+            )
 
-    # At this point all mixmasta.normalize() is completed for all input files. 
-    # There will be multiple .pkl files with the prefix 
+    # At this point all mixmasta.normalize() is completed for all input files.
+    # There will be multiple .pkl files with the prefix
     # {PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}
-    # 
-    # Processing of these pkl files is delayed so that the column names of 
-    # output files were collated ensuring the parquet files have the same 
+    #
+    # Processing of these pkl files is delayed so that the column names of
+    # output files were collated ensuring the parquet files have the same
     # columns even if they are full of NaN.
 
     # Reiterate the input file names. Load all tmp pkl files. Set colnames.
     for idx, item_item in enumerate(input_array):
         # Handle filename wildcards with glob_input_file().
-        input_file =  glob_input_file(item_item["input_file"])
-    
+        input_file = glob_input_file(item_item["input_file"])
+
         # Reassemble tmp files into df ...)
-        df_final = pd.concat([pd.read_pickle(fl) for fl in glob(f'{PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}.*.pkl')])
+        df_final = pd.concat(
+            [
+                pd.read_pickle(fl)
+                for fl in glob(
+                    f"{PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}.*.pkl"
+                )
+            ]
+        )
 
         # Add any columns in output_columns but not in this dataframe.
-        for col in list(set(output_columns).difference(set(df_final.columns.values.tolist()))):
+        for col in list(
+            set(output_columns).difference(set(df_final.columns.values.tolist()))
+        ):
             df_final[col] = np.nan
 
         # Ensure column order is the same across all output files.
         df_final = df_final[output_columns]
         df_final.reset_index(inplace=True, drop=True)
-    
-        # ... then clean up reassembly. 
-        for fl in glob(f'{PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}.*'):
+
+        # ... then clean up reassembly.
+        for fl in glob(f"{PROCESSED_TEMP_FILENAME}.{os.path.basename(input_file)}.*"):
             os.remove(fl)
-       
+
         # Write separate parquet files depending on type of value column ...
         # ... by creating a separting df for value col of type str ...
-        df_final['type'] = df_final[['value']].applymap(type)
-        df_final_str = df_final[df_final['type']==str]
-        df_final = df_final[df_final['type']!=str]
-        del(df_final_str['type'])
-        del(df_final['type'])
+        df_final["type"] = df_final[["value"]].applymap(type)
+        df_final_str = df_final[df_final["type"] == str]
+        df_final = df_final[df_final["type"] != str]
+        del df_final_str["type"]
+        del df_final["type"]
 
         # ... now write the files.
         df_final.to_parquet(f"{output_file}.{idx+1}.parquet.gzip", compression="gzip")
         if not df_final_str.empty:
-            df_final_str.to_parquet(f"{output_file}_str.{idx+1}.parquet.gzip", compression="gzip")
+            df_final_str.to_parquet(
+                f"{output_file}_str.{idx+1}.parquet.gzip", compression="gzip"
+            )
 
     # Causemosify-multi does not return the dataframe or dict.
 
-    click.echo('Done.')
+    click.echo("Done.")
 
 
 @cli.command()
@@ -450,10 +494,10 @@ def download():
     download_and_clean("admin3")
 
 
-if __name__ == "__main__": 
-    
+if __name__ == "__main__":
+
     cli()
-    '''
+    """
     # Testing
     if os.name == 'nt':
         sep = '\\'
@@ -485,4 +529,4 @@ if __name__ == "__main__":
     inputs = inputs + f"./tests/inputs{sep}test3_qualifies.csv\",\"mapper\": \"./tests/inputs{sep}test3_qualifies.json\"" + "}]"
 
     causemosify_multi(inputs, geo='admin2', output_file='testing') # geo='admin1', 
-    '''
+    """
