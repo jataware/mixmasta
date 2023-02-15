@@ -168,6 +168,8 @@ def clip_data(dataframe, geo_columns, polygons_list):
         pandas.Dataframe: A pandas dataframe only containing the clipped data.
     """
 
+    print(f"POLY LIST {polygons_list}")
+
     mask = construct_multipolygon(polygons_list=polygons_list)
 
     return clip_dataframe(dataframe=dataframe, geo_columns=geo_columns, mask=mask)

@@ -1,38 +1,88 @@
-import geopandas
+import math
+import xarray
 import numpy
-import pandas
-from shapely.geometry import box
 
 
 def regrid_dataframe(dataframe, geo_columns):
-    x_geo = dataframe[geo_columns[0]]
-    y_geo = dataframe[geo_columns[1]]
-    geo_dataframe = geopandas.GeoDataFrame(
-        dataframe, geometry=geopandas.points_from_xy(x_geo, y_geo)
+    """Uses xarray interpolation to regrid geography in a dataframe.
+
+    Args:
+        dataframe (_type_): _description_
+        geo_columns (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+
+    ds = xarray.Dataset.from_dataframe(dataframe)
+
+    geo_dim_0 = geo_columns[0] + "_dim"
+    geo_dim_1 = geo_columns[1] + "_dim"
+
+    coord_dict = {
+        geo_columns[0]: (geo_dim_0, ds[geo_columns[0]].data),
+        geo_columns[1]: (geo_dim_1, ds[geo_columns[1]].data),
+    }
+
+    ds = ds.assign_coords(**coord_dict)
+
+    print(f"Xarray DS: {ds}")
+
+    print(
+        f"SCALE VALUES: {ds[geo_columns[0]][0]} , {ds[geo_columns[1]][0]} , {ds[geo_columns[0]][1]} , {ds[geo_columns[1]][1]}"
     )
 
-    xmin, ymin, xmax, ymax = geo_dataframe.total_bounds
+    ds_scale = getScale(
+        ds[geo_columns[0]][0],
+        ds[geo_columns[1]][0],
+        ds[geo_columns[0]][1],
+        ds[geo_columns[1]][1],
+    )
 
-    n_cells = 30
-    cell_size = (xmax - xmin) / n_cells
+    print(f"SCALE {ds_scale}")
 
-    grid_cells = []
+    multiplier = ds_scale / 500
+    print(f"MULTIPLIER {multiplier}")
 
-    for x0 in numpy.arange(xmin, xmax + cell_size, cell_size):
-        for y0 in numpy.arange(ymin, ymax + cell_size, cell_size):
-            # bounds
-            x1 = x0 - cell_size
-            y1 = y0 + cell_size
-            grid_cells.append(box(x0, y0, x1, y1))
+    new_0 = numpy.linspace(
+        ds[geo_columns[0]][0],
+        ds[geo_columns[0]][-1],
+        round(ds.dims[geo_dim_0] * multiplier),
+    )
+    new_1 = numpy.linspace(
+        ds[geo_columns[1]][0],
+        ds[geo_columns[1]][-1],
+        round(ds.dims[geo_dim_1] * multiplier),
+    )
 
-    cell = geopandas.GeoDataFrame(grid_cells, columns=["geometry"])
+    interpolation = {geo_dim_0: new_0, geo_dim_1: new_1}
 
-    merged = geopandas.sjoin(geo_dataframe, cell, how="left", op="within")
-    print(f"MERGED: {merged}")
+    ds2 = ds.interp(**interpolation)
+    print(ds2)
 
-    dissolve = merged.dissolve(by="index_right", aggfunc="sum")
-    print(f"DISSOLVED: {dissolve}")
+    p_dataframe = ds2.to_dataframe()
 
-    cell.loc[dissolve.index, "fatalities"] = dissolve.fatalities.values
+    return p_dataframe
 
-    print(f"REGRID DATA: {cell}")
+
+def getScale(lat0, lon0, lat1, lon1):
+    """
+    Description
+    -----------
+    Return an estimation of the scale in km of a netcdf dataset.
+    The estimate is based on the first two data points, and returns
+    the scale distance at that lat/lon.
+
+    """
+    r = 6371  # Radius of the earth in km
+    dLat = numpy.radians(lat1 - lat0)
+    dLon = numpy.radians(lon1 - lon0)
+
+    a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.cos(
+        numpy.radians(lat0)
+    ) * math.cos(numpy.radians(lat1)) * math.sin(dLon / 2) * math.sin(dLon / 2)
+
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    d = r * c
+    # Distance in km
+    return d

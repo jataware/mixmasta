@@ -20,10 +20,12 @@ def date_type_handler(dataframe, date_dict):
     """
     date_type = date_dict["date_type"]
     # print(f"DATE TYPE: {date_type}")
-    primary_date = date_dict.get("primary_date")
+    primary_date = date_dict.get("primary_date", False)
     date_column_name = date_dict["name"]
     if date_type == "date":
-        return add_date_to_dataframe_as_epoch(dataframe, date_dict, date_column_name)
+        return add_date_to_dataframe_as_epoch(
+            dataframe, date_dict, date_column_name, primary_date=primary_date
+        )
     if date_type == "epoch":
         return rename_column_to_timestamp(
             dataframe=dataframe, original_date_column_name=date_column_name

@@ -200,6 +200,8 @@ class TestMixmaster(unittest.TestCase):
     def test_004_process(self):
         """Test .xlxs file, qualifies col with multi dtypes."""
 
+        print("TEST 4 START")
+
         # Define mixmasta inputs:
         mp = f"inputs{sep}test4_rainfall_error.json"
         fp = f"inputs{sep}test4_rainfall_error.xlsx"
@@ -247,6 +249,8 @@ class TestMixmaster(unittest.TestCase):
         # Assertions
         assert_frame_equal(df, output_df, check_categorical=False)
         assert_dict_equal(dct, output_dict)
+
+        print("TEST 4 FINISH")
 
     def test_005__command_line_interface(self):
         """Test the CLI and causemosify-multi."""
